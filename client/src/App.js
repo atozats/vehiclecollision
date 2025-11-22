@@ -3,10 +3,11 @@ import io from "socket.io-client";
 import CollisionAlert from "./components/CollisionAlert";
 import Dashboard from "./components/Dashboard";
 import MapDemo from "./components/MapDemo";
+import LandingPage from "./components/LandingPage";
 import "./App.css";
 
-const socket = io("http://localhost:5000");
-// const socket = io("https://vehiclecollisionapp.testatozas.in");
+//const socket = io("http://localhost:5000");
+const socket = io("https://vehiclecollisionapp.testatozas.in");
 
 function App() {
   const [vehicles, setVehicles] = useState([]);
@@ -14,6 +15,7 @@ function App() {
   const [collisionAlert, setCollisionAlert] = useState(null);
   const [demoMode, setDemoMode] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [showLandingPage, setShowLandingPage] = useState(true);
   const [gpsStatus, setGpsStatus] = useState("inactive"); // inactive, searching, active, error
   const [systemStatus, setSystemStatus] = useState({
     monitoring: "Active",
@@ -86,19 +88,26 @@ function App() {
             const result = await response.json();
             if (result.success) {
               setCurrentUser(result.user);
+              setShowLandingPage(false);
               // Auto-register the user as a vehicle (but don't wait for response)
               handleAddVehicle(result.user.phoneNumber, result.user.vehicleId, result.user.name, result.user.vehicleType || 'car')
                 .catch(error => console.error("Auto-registration failed:", error));
+            } else {
+              setShowLandingPage(true);
             }
           } else {
             // User not found in database, clear local storage
             localStorage.removeItem("userPhone");
+            setShowLandingPage(true);
           }
         } catch (error) {
           console.error("Failed to fetch user data:", error);
           // Clear local storage on error
           localStorage.removeItem("userPhone");
+          setShowLandingPage(true);
         }
+      } else {
+        setShowLandingPage(true);
       }
     };
 
@@ -440,6 +449,9 @@ function App() {
 
   const handleUpdateUser = (userData) => {
     setCurrentUser(userData);
+    if (userData) {
+      setShowLandingPage(false);
+    }
   };
 
   const stopGPSTracking = () => {
@@ -516,6 +528,22 @@ function App() {
     setCollisionAlert(null);
   };
 
+  const handleGetStarted = () => {
+    setShowLandingPage(false);
+  };
+
+  const handleBackToLanding = () => {
+    setShowLandingPage(true);
+  };
+
+  // Show landing page if no user and landing page should be shown
+  if (showLandingPage && !currentUser) {
+    return (
+      <div className="App">
+        <LandingPage onGetStarted={handleGetStarted} />
+      </div>
+    );
+  }
 
   if (demoMode) {
     return (
@@ -552,6 +580,15 @@ function App() {
       <header className="App-header">
         <div className="header-content">
           <div className="header-main">
+            {!currentUser && (
+              <button 
+                className="back-btn"
+                onClick={handleBackToLanding}
+                title="Back to Landing Page"
+              >
+                ← Back
+              </button>
+            )}
             <span className="header-icon">🚗</span>
             <div>
               <h1>Vehicle Collision Warning System</h1>
