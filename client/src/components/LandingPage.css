@@ -1,6 +1,6 @@
 /* ===== LANDING PAGE STYLES ===== */
 .landing-page {
-  min-height: 100vh;
+  min-height: 90vh;
   background: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%);
   display: flex;
   align-items: center;
@@ -31,7 +31,7 @@
 .landing-content {
   background: white;
   border-radius: 20px;
-  padding: 60px 40px;
+  padding: 20px 20px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   text-align: center;
   animation: fadeInUp 0.8s ease-out;
@@ -49,13 +49,16 @@
 }
 
 .landing-header {
-  margin-bottom: 40px;
+  margin-bottom: -20px;
 }
 
 .landing-icon {
-  font-size: 80px;
-  margin-bottom: 20px;
+  font-size: 40px;
+  /* margin-bottom: -10px; */
   animation: pulse 2s infinite;
+  margin-top: -10px;
+  font-weight: 800;
+  color:  #6c5ce7;
 }
 
 @keyframes pulse {
@@ -68,8 +71,8 @@
 }
 
 .landing-title {
-  font-size: 3rem;
-  font-weight: 800;
+  font-size: 2rem;
+  /* font-weight: 600; */
   color: #2d3436;
   margin: 0 0 15px 0;
   background: linear-gradient(135deg, #6c5ce7, #a29bfe);
@@ -140,6 +143,7 @@
   justify-content: center;
   margin: 50px 0 30px 0;
   flex-wrap: wrap;
+  margin-top: -20px;
 }
 
 .landing-btn {

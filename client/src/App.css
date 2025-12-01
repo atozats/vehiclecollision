@@ -77,6 +77,23 @@
   align-items: center;
 }
 
+.about-btn {
+  padding: 6px 14px;
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: all 0.2s ease;
+}
+
+.about-btn:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
 .user-details {
   display: flex;
   flex-direction: column;

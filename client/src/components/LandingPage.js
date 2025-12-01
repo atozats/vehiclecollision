@@ -1,7 +1,7 @@
 import React from "react";
 import "./LandingPage.css";
 
-const LandingPage = ({ onGetStarted }) => {
+const LandingPage = ({ onGetStarted, onShowAboutLegal }) => {
   const handleGetStarted = () => {
     if (onGetStarted) {
       onGetStarted();
@@ -9,9 +9,9 @@ const LandingPage = ({ onGetStarted }) => {
   };
 
   const handleGoToGitHub = () => {
-    // GitHub repository URL - Update this with your actual repository URL
-    const githubUrl = "https://github.com/yourusername/accidentalarmwithGPS-react1";
-    window.open(githubUrl, "_blank");
+    if (onShowAboutLegal) {
+      onShowAboutLegal();
+    }
   };
 
   return (
@@ -19,9 +19,9 @@ const LandingPage = ({ onGetStarted }) => {
       <div className="landing-container">
         <div className="landing-content">
           <div className="landing-header">
-            <div className="landing-icon">🚗</div>
+          <div className="landing-icon">UCASA APP</div>
             <h1 className="landing-title">
-              Collision Avoidance System
+            Universal Collision Avoidance System Advisory App
             </h1>
             <p className="landing-subtitle">
               Advanced safety system that quickly detects accidents, sends emergency alerts, 
@@ -48,10 +48,10 @@ const LandingPage = ({ onGetStarted }) => {
                 <span className="feature-icon">📍</span>
                 <span className="feature-text">GPS Location Tracking</span>
               </div>
-              <div className="feature-item">
+              {/* <div className="feature-item">
                 <span className="feature-icon">📊</span>
                 <span className="feature-text">Incident Reporting</span>
-              </div>
+              </div> */}
             </div>
           </div>
 

@@ -4,6 +4,7 @@ import CollisionAlert from "./components/CollisionAlert";
 import Dashboard from "./components/Dashboard";
 import MapDemo from "./components/MapDemo";
 import LandingPage from "./components/LandingPage";
+import AboutLegal from "./components/AboutLegal";
 import "./App.css";
 
 //const socket = io("http://localhost:5000");
@@ -24,6 +25,7 @@ function App() {
     warningThreshold: 5,
     maxRange: "0.6km / 5km max range",
   });
+  const [showAboutLegal, setShowAboutLegal] = useState(false);
 
   // Separate useEffect for socket setup
   useEffect(() => {
@@ -540,7 +542,14 @@ function App() {
   if (showLandingPage && !currentUser) {
     return (
       <div className="App">
-        <LandingPage onGetStarted={handleGetStarted} />
+        <LandingPage 
+          onGetStarted={handleGetStarted} 
+          onShowAboutLegal={() => setShowAboutLegal(true)} 
+        />
+        <AboutLegal
+          open={showAboutLegal}
+          onClose={() => setShowAboutLegal(false)}
+        />
       </div>
     );
   }
@@ -589,9 +598,9 @@ function App() {
                 ← Back
               </button>
             )}
-            <span className="header-icon">🚗</span>
+            {/* <span className="header-icon">UcasaApp</span> */}
             <div>
-              <h1>Vehicle Collision Warning System</h1>
+              <h1>Universal Collision Avoidance System Advisory App</h1>
               <p>GPS-based proximity alarm for accident prevention</p>
             </div>
           </div>
@@ -624,6 +633,13 @@ function App() {
                   </button>
                 </>
               ) : null} */}
+              {/* <button
+                type="button"
+                className="about-btn"
+                onClick={() => setShowAboutLegal(true)}
+              >
+                About / Legal
+              </button> */}
             </div>
           </div>
         </div>
@@ -650,6 +666,11 @@ function App() {
         {collisionAlert && (
           <CollisionAlert alert={collisionAlert} onDismiss={dismissAlert} />
         )}
+
+        <AboutLegal
+          open={showAboutLegal}
+          onClose={() => setShowAboutLegal(false)}
+        />
       </main>
     </div>
   );
