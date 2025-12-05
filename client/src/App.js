@@ -5,10 +5,12 @@ import Dashboard from "./components/Dashboard";
 import MapDemo from "./components/MapDemo";
 import LandingPage from "./components/LandingPage";
 import AboutLegal from "./components/AboutLegal";
+import Contact from "./components/Contact";
+import Feedback from "./components/Feedback";
 import "./App.css";
 
-//const socket = io("http://localhost:5000");
-const socket = io("https://vehiclecollisionapp.testatozas.in");
+const socket = io("http://localhost:5000");
+//const socket = io("https://vehiclecollisionapp.testatozas.in");
 
 function App() {
   const [vehicles, setVehicles] = useState([]);
@@ -26,6 +28,9 @@ function App() {
     maxRange: "0.6km / 5km max range",
   });
   const [showAboutLegal, setShowAboutLegal] = useState(false);
+  const [aboutLegalView, setAboutLegalView] = useState(null);
+  const [showContact, setShowContact] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   // Separate useEffect for socket setup
   useEffect(() => {
@@ -85,7 +90,7 @@ function App() {
       const storedPhone = localStorage.getItem("userPhone");
       if (storedPhone) {
         try {
-          const response = await fetch(`https://vehiclecollisionapp.testatozas.in/api/user/${storedPhone}`);
+          const response = await fetch(`http://localhost:5000/api/user/${storedPhone}`);
           if (response.ok) {
             const result = await response.json();
             if (result.success) {
@@ -538,6 +543,34 @@ function App() {
     setShowLandingPage(true);
   };
 
+  const handleShowAboutLegalWithView = (view) => {
+    setAboutLegalView(view);
+    setShowAboutLegal(true);
+  };
+
+  const handleCloseAboutLegal = () => {
+    setShowAboutLegal(false);
+    setAboutLegalView(null);
+  };
+
+  // Show contact page
+  if (showContact) {
+    return (
+      <div className="App">
+        <Contact onBack={() => setShowContact(false)} />
+      </div>
+    );
+  }
+
+  // Show feedback page
+  if (showFeedback) {
+    return (
+      <div className="App">
+        <Feedback onBack={() => setShowFeedback(false)} />
+      </div>
+    );
+  }
+
   // Show landing page if no user and landing page should be shown
   if (showLandingPage && !currentUser) {
     return (
@@ -545,10 +578,14 @@ function App() {
         <LandingPage 
           onGetStarted={handleGetStarted} 
           onShowAboutLegal={() => setShowAboutLegal(true)} 
+          onShowAboutLegalWithView={handleShowAboutLegalWithView}
+          onShowContact={() => setShowContact(true)}
+          onShowFeedback={() => setShowFeedback(true)}
         />
         <AboutLegal
           open={showAboutLegal}
-          onClose={() => setShowAboutLegal(false)}
+          onClose={handleCloseAboutLegal}
+          initialView={aboutLegalView}
         />
       </div>
     );
@@ -669,7 +706,8 @@ function App() {
 
         <AboutLegal
           open={showAboutLegal}
-          onClose={() => setShowAboutLegal(false)}
+          onClose={handleCloseAboutLegal}
+          initialView={aboutLegalView}
         />
       </main>
     </div>

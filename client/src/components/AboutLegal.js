@@ -1,8 +1,17 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "./AboutLegal.css";
 
-const AboutLegal = ({ open, onClose }) => {
-  const [currentView, setCurrentView] = useState(null); // null, 'license', 'privacy', 'terms'
+const AboutLegal = ({ open, onClose, initialView = null }) => {
+  const [currentView, setCurrentView] = useState(initialView); // null, 'license', 'privacy', 'terms'
+
+  // Update currentView when initialView prop changes
+  useEffect(() => {
+    if (open && initialView) {
+      setCurrentView(initialView);
+    } else if (!open) {
+      setCurrentView(null);
+    }
+  }, [open, initialView]);
 
   if (!open) return null;
 
@@ -11,7 +20,15 @@ const AboutLegal = ({ open, onClose }) => {
   };
 
   const handleBack = () => {
-    setCurrentView(null);
+    // If viewing Privacy Policy or Terms of Use, close modal and navigate to landing page
+    if (currentView === 'privacy' || currentView === 'terms') {
+      if (onClose) {
+        onClose();
+      }
+    } else {
+      // For other views (like license), just go back to main view
+      setCurrentView(null);
+    }
   };
 
   // Helper function to format markdown-like content to JSX
@@ -363,9 +380,8 @@ You agree to:
 - Alerts may be delayed, incomplete, inaccurate, or may fail to trigger in time.
 
 You acknowledge and agree that:
-- AtoZ does not guarantee that all collisions or dangerous situations will be detected or avoided.
-- The driver is always responsible for:
-  - Maintaining control of the vehicle.
+- AtoZ Automation Solutions Pvt. Ltd. does not guarantee that all collisions or dangerous situations will be detected or avoided.
+- The driver is always responsible for:  Maintaining control of the vehicle.
   - Observing surroundings and following traffic rules.
   - Making safe driving decisions, regardless of any alerts or suggestions from the Service.
 ---
@@ -381,13 +397,11 @@ If you are using the Service on behalf of an organization (e.g. fleet operator, 
 ---
 ## 6. Intellectual Property
 - The open-source portions of the Service are licensed under the license described in \`LICENSE\`.
-- AtoZ and/or its licensors retain ownership of:
-  - The underlying intellectual property.
-  - Trade names, trademarks, service marks, and logos.
+- AtoZ Automation Solutions Pvt. Ltd. and/or its licensors retain ownership of all underlying intellectual property, including trade names, trademarks, service marks, and logos.
 You may not use the AtoZ name, logo, or branding in a way that suggests endorsement or affiliation without prior written permission, except as allowed by any published trademark policy.
 ---
 ## 7. Privacy
-Your use of the Service is also governed by our \`PRIVACY_POLICY.md\`, which describes how we collect, use, and protect personal data (including GPS location data).
+Your use of the Service is also governed by our PRIVACY_POLICY, which describes how we collect, use, and protect personal data (including GPS location data).
 By using the Service, you acknowledge that you have read and understood the Privacy Policy.
 ---
 ## 8. Availability and Modifications
@@ -405,7 +419,7 @@ The Service is provided **"as is"** and **"as available"**, without warranties o
 - Accuracy or completeness of location or map data.
 
 To the maximum extent permitted by law:
-- AtoZ, its affiliates, officers, employees, and agents will not be liable for:
+- AtoZ Automation Solutions Pvt. Ltd, its affiliates, officers, employees, and agents will not be liable for:
   - Any indirect, incidental, special, consequential, or punitive damages.
   - Any loss of life, injury, property damage, or traffic violations alleged to have arisen from the use or inability to use the Service.
 - Where liability cannot be excluded, it may be limited:
@@ -422,8 +436,8 @@ You agree to indemnify and hold harmless AtoZ and its affiliates from and agains
 
 ## 11. Governing Law and Dispute Resolution
 Unless otherwise required by law:
-- These Terms are governed by the laws of **[Insert Jurisdiction, e.g., India]**.
-- Any disputes arising out of or related to these Terms or the Service shall be subject to the exclusive jurisdiction of the courts located in **[Insert City/State]**.
+- These Terms are governed by the laws of India.
+- Any disputes arising out of or related to these Terms or the Service shall be subject to the exclusive jurisdiction of the courts located in NEW DELHI.
 You should update this section to match the registered office and preferred legal jurisdiction for AtoZ Automation Solutions Pvt. Ltd.
 
 ---
@@ -551,7 +565,7 @@ If you continue to use the Service after the updated Terms take effect, you agre
                 View GNU GPL License
               </a>
             </li>
-            <li>
+            {/* <li>
               <a
                 href="#"
                 onClick={openPrivacyPolicy}
@@ -568,7 +582,7 @@ If you continue to use the Service after the updated Terms take effect, you agre
               >
                 View Terms of Use
               </a>
-            </li>
+            </li> */}
           </ul>
         </section>
 

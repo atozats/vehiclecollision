@@ -1,7 +1,7 @@
 import React from "react";
 import "./LandingPage.css";
 
-const LandingPage = ({ onGetStarted, onShowAboutLegal }) => {
+const LandingPage = ({ onGetStarted, onShowAboutLegal, onShowAboutLegalWithView, onShowContact, onShowFeedback }) => {
   const handleGetStarted = () => {
     if (onGetStarted) {
       onGetStarted();
@@ -9,8 +9,43 @@ const LandingPage = ({ onGetStarted, onShowAboutLegal }) => {
   };
 
   const handleGoToGitHub = () => {
-    const githubUrl = "https://github.com/atozats/vehiclecollision";
-    window.open(githubUrl, "_blank", "noopener,noreferrer");
+    if (onShowAboutLegal) {
+      onShowAboutLegal();
+    }
+    // const githubUrl = "https://github.com/atozats/vehiclecollision";
+    // window.open(githubUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const handlePrivacyPolicy = (e) => {
+    e.preventDefault();
+    if (onShowAboutLegalWithView) {
+      onShowAboutLegalWithView('privacy');
+    } else if (onShowAboutLegal) {
+      onShowAboutLegal();
+    }
+  };
+
+  const handleTermsOfUse = (e) => {
+    e.preventDefault();
+    if (onShowAboutLegalWithView) {
+      onShowAboutLegalWithView('terms');
+    } else if (onShowAboutLegal) {
+      onShowAboutLegal();
+    }
+  };
+
+  const handleContact = (e) => {
+    e.preventDefault();
+    if (onShowContact) {
+      onShowContact();
+    }
+  };
+
+  const handleFeedback = (e) => {
+    e.preventDefault();
+    if (onShowFeedback) {
+      onShowFeedback();
+    }
   };
 
   return (
@@ -138,11 +173,56 @@ const LandingPage = ({ onGetStarted, onShowAboutLegal }) => {
             </div>
           </div>
 
-          <div className="landing-footer">
-            <p className="landing-footer-text">
-              Open Source • Built with ❤️ for Road Safety
-            </p>
-          </div>
+          <footer className="landing-footer">
+            <div className="footer-content">
+              <div className="footer-section">
+                <p className="footer-product-name">UCASA App</p>
+                <p className="footer-powered-by">Powered by <span className="footer-company-name">ATOZAS</span></p>
+                <p className="footer-product-full-name">Universal Collision Avoidance System Advisory App</p>
+              </div>
+              
+              <div className="footer-section">
+                <h4 className="footer-links-title">Legal</h4>
+                <ul className="footer-links">
+                  <li>
+                    <a href="#" onClick={handlePrivacyPolicy} className="footer-link">
+                      Privacy Policy
+                    </a>
+                  </li>
+                  <li>
+                    <a href="#" onClick={handleTermsOfUse} className="footer-link">
+                      Terms of Use
+                    </a>
+                  </li>
+                </ul>
+              </div>
+              
+              <div className="footer-section">
+                <h4 className="footer-links-title">Support</h4>
+                <ul className="footer-links">
+                  <li>
+                    <a href="#" onClick={handleContact} className="footer-link">
+                      Contact Us
+                    </a>
+                  </li>
+                  <li>
+                    <a href="#" onClick={handleFeedback} className="footer-link">
+                      Feedback
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </div>
+            
+            <div className="footer-bottom">
+              <p className="landing-footer-text">
+                Open Source • Built with ❤️ for Road Safety
+              </p>
+              <p className="footer-copyright">
+                © {new Date().getFullYear()} ATOZAS. All rights reserved.
+              </p>
+            </div>
+          </footer>
         </div>
       </div>
     </div>
