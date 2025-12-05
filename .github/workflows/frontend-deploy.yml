@@ -1,0 +1,76 @@
+name: Deploy Frontend
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - "client/**"
+      - ".github/workflows/frontend-deploy.yml"
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: client
+        env:
+          # Prevent Create React App from treating lint warnings as build errors in CI
+          CI: "false"
+        run: npm run build
+
+      - name: Deploy build to VPS
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_APP_DIR: ${{ secrets.VPS_APP_DIR }}
+        run: |
+          set -e
+
+          # Basic validation so failures clearly point to missing secrets
+          if [ -z "$SSH_KEY" ] || [ -z "$VPS_USER" ] || [ -z "$VPS_HOST" ] || [ -z "$VPS_APP_DIR" ]; then
+            echo "ERROR: One or more required VPS_* secrets are missing or empty."
+            echo "  VPS_SSH_KEY set?  -> $([ -n "$SSH_KEY" ] && echo yes || echo no)"
+            echo "  VPS_USER set?     -> $([ -n "$VPS_USER" ] && echo yes || echo no)"
+            echo "  VPS_HOST set?     -> $([ -n "$VPS_HOST" ] && echo yes || echo no)"
+            echo "  VPS_APP_DIR set?  -> $([ -n "$VPS_APP_DIR" ] && echo yes || echo no)"
+            exit 1
+          fi
+
+          PORT_OPT=""
+          if [ -n "$VPS_PORT" ]; then
+            PORT_OPT="-p $VPS_PORT"
+          fi
+
+          echo "Preparing SSH for $VPS_USER@$VPS_HOST (port: ${VPS_PORT:-22})"
+
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # ssh-keyscan may fail if firewall blocks it; don't fail the whole job for that
+          ssh-keyscan $([ -n "$VPS_PORT" ] && echo "-p $VPS_PORT") -H "$VPS_HOST" >> ~/.ssh/known_hosts || \
+            echo "Warning: ssh-keyscan failed, continuing without pre-populated known_hosts"
+
+          # Sync React build into server/build on the VPS (used by Express static)
+          rsync -az --delete -e "ssh $PORT_OPT" client/build/ "$VPS_USER@$VPS_HOST:$VPS_APP_DIR/server/build/"
+
+

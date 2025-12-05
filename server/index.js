@@ -4,6 +4,7 @@ const socketIo = require("socket.io");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const { getDistance, getRhumbLineBearing } = require("geolib");
+const nodemailer = require("nodemailer");
 require("dotenv").config();
 const path = require("path");
 
@@ -11,7 +12,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: "https://ucasaapp.testatozas.in/",
     methods: ["GET", "POST"],
   },
 });
@@ -68,7 +69,7 @@ app.get("*", (req, res) => {
 
 // Socket connection handling
 io.on("connection", (socket) => {
-  console.log("Client connected:", socket.id);
+  //console.log("Client connected:", socket.id);
 
   socket.on("register-vehicle", async (data) => {
     const { phoneNumber, vehicleId, fullName, vehicleType } = data;
@@ -229,7 +230,7 @@ io.on("connection", (socket) => {
         "currentLocation.longitude": { $exists: true, $ne: null },
       }).sort({ "currentLocation.timestamp": -1 });
 
-      console.log(`Fetched ${allUsers.length} users with location data`);
+      //console.log(`Fetched ${allUsers.length} users with location data`);
       socket.emit("all-users-update", allUsers);
     } catch (error) {
       console.error("Get all users error:", error);
@@ -641,6 +642,128 @@ app.post("/api/vehicles", async (req, res) => {
   }
 });
 
+// Nodemailer transporter configuration
+const transporter = nodemailer.createTransport({
+  name: process.env.SMTP_NAME,
+  host: process.env.SMTP_SERVER,
+  port: parseInt(process.env.SMTP_PORT),
+  secure: process.env.SMTP_SECURE === 'true',
+  auth: {
+    user: process.env.SMTP_EMAIL,
+    pass: process.env.SMTP_EMAIL_PASSWORD,
+  },
+  tls: {
+    rejectUnauthorized: false, // Bypass hostname mismatch
+  },
+});
+
+// Feedback endpoint
+app.post("/api/feedback", async (req, res) => {
+  try {
+    const { name, email, feedbackType, rating, message } = req.body;
+
+    // Validate required fields
+    if (!name || !email || !feedbackType || !message) {
+      return res.status(400).json({ error: "All required fields must be filled" });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: "Invalid email format" });
+    }
+
+    // Prepare email content
+    const emailSubject = `UCASA Feedback - ${feedbackType}`;
+    const emailBody = `
+      <h2>New Feedback Received</h2>
+      <p><strong>Name:</strong> ${name}</p>
+      <p><strong>Email:</strong> ${email}</p>
+      <p><strong>Feedback Type:</strong> ${feedbackType}</p>
+      <p><strong>Rating:</strong> ${rating || "Not provided"}</p>
+      <hr>
+      <h3>Message:</h3>
+      <p>${message.replace(/\n/g, "<br>")}</p>
+      <hr>
+      <p><em>Submitted at: ${new Date().toLocaleString()}</em></p>
+    `;
+
+    // Send email
+    const mailOptions = {
+      from: process.env.SMTP_EMAIL,
+      to: "ucasa@testatozas.in",
+      subject: emailSubject,
+      html: emailBody,
+      replyTo: email,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.status(200).json({ 
+      success: true, 
+      message: "Feedback submitted successfully" 
+    });
+  } catch (error) {
+    console.error("Error sending feedback email:", error);
+    res.status(500).json({ 
+      error: "Failed to submit feedback. Please try again later." 
+    });
+  }
+});
+
+// Contact endpoint
+app.post("/api/contact", async (req, res) => {
+  try {
+    const { name, email, phone, subject, message } = req.body;
+
+    // Validate required fields
+    if (!name || !email || !subject || !message) {
+      return res.status(400).json({ error: "All required fields must be filled" });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: "Invalid email format" });
+    }
+
+    // Prepare email content
+    const emailSubject = `UCASA Contact - ${subject}`;
+    const emailBody = `
+      <h2>New Contact Message Received</h2>
+      <p><strong>Name:</strong> ${name}</p>
+      <p><strong>Email:</strong> ${email}</p>
+      <p><strong>Phone:</strong> ${phone || "Not provided"}</p>
+      <p><strong>Subject:</strong> ${subject}</p>
+      <hr>
+      <h3>Message:</h3>
+      <p>${message.replace(/\n/g, "<br>")}</p>
+      <hr>
+      <p><em>Submitted at: ${new Date().toLocaleString()}</em></p>
+    `;
+
+    // Send email
+    const mailOptions = {
+      from: process.env.SMTP_EMAIL,
+      to: "ucasa@testatozas.in",
+      subject: emailSubject,
+      html: emailBody,
+      replyTo: email,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.status(200).json({ 
+      success: true, 
+      message: "Message sent successfully" 
+    });
+  } catch (error) {
+    console.error("Error sending contact email:", error);
+    res.status(500).json({ 
+      error: "Failed to send message. Please try again later." 
+    });
+  }
+});
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
