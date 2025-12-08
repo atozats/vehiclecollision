@@ -40,6 +40,7 @@ jobs:
             exit 1
           fi
 
+          
           PORT_OPT=""
           if [ -n "$VPS_PORT" ]; then
             PORT_OPT="-p $VPS_PORT"
