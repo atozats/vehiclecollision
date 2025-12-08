@@ -57,7 +57,7 @@ jobs:
           # Sync backend code to VPS (without node_modules)
           rsync -az --delete -e "ssh $PORT_OPT" \
             --exclude "node_modules" \
-            server/ "$VPS_USER@$VPS_HOST:$VPS_APP_DIR/server/"
+            server/ "$VPS_USER@$VPS_HOST:$VPS_APP_DIR/"
 
       - name: Install dependencies and restart Node server
         env:
@@ -74,7 +74,7 @@ jobs:
           ssh $PORT_OPT "$VPS_USER@$VPS_HOST" bash << EOF
           set -e
           echo "Using VPS_APP_DIR: $VPS_APP_DIR"
-          cd "$VPS_APP_DIR/server"
+          cd "$VPS_APP_DIR"
 
           # Install/refresh production dependencies
           if command -v npm >/dev/null 2>&1; then

@@ -72,6 +72,6 @@ jobs:
             echo "Warning: ssh-keyscan failed, continuing without pre-populated known_hosts"
 
           # Sync React build into server/build on the VPS (used by Express static)
-          rsync -az --delete -e "ssh $PORT_OPT" client/build/ "$VPS_USER@$VPS_HOST:$VPS_APP_DIR/server/build/"
+          rsync -az --delete -e "ssh $PORT_OPT" client/build/ "$VPS_USER@$VPS_HOST:$VPS_APP_DIR/build/"
 
 
