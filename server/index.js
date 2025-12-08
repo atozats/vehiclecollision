@@ -56,7 +56,6 @@ const Vehicle = mongoose.model("Vehicle", vehicleSchema);
 // Store active connections
 const activeConnections = new Map();
 
-
 // Store previous distance data for tracking approaching/receding vehicles
 // Key format: "phoneNumber1-phoneNumber2" (sorted alphabetically)
 const previousDistances = new Map();
