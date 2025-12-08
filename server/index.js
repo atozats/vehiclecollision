@@ -765,7 +765,7 @@ app.post("/api/contact", async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 5453;
+const PORT = process.env.PORT || 8787;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
