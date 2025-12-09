@@ -1,11 +1,14 @@
-const CACHE_NAME = 'ucasaapp-v1.0.0';
+const CACHE_NAME = 'ucasaapp-v1.0.1';
 const urlsToCache = [
   '/',
   '/index.html',
   '/manifest.json',
   '/favicon.ico',
-  '/logo192.png',
-  '/logo512.png'
+  '/favicon-96x96.png',
+  '/favicon.svg',
+  '/apple-touch-icon.png',
+  '/web-app-manifest-192x192.png',
+  '/web-app-manifest-512x512.png'
 ];
 
 // Install event - cache resources
