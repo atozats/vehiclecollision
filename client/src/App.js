@@ -7,6 +7,7 @@ import LandingPage from "./components/LandingPage";
 import AboutLegal from "./components/AboutLegal";
 import Contact from "./components/Contact";
 import Feedback from "./components/Feedback";
+import InstallPrompt from "./components/InstallPrompt";
 import "./App.css";
 
 // const socket = io("http://localhost:5000");
@@ -710,6 +711,9 @@ function App() {
           initialView={aboutLegalView}
         />
       </main>
+
+      {/* PWA Install Prompt */}
+      <InstallPrompt />
     </div>
   );
 }

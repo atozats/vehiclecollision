@@ -1,12 +1,13 @@
 {
-  "short_name": "ATOZAS UCASAPP",
+  "short_name": "Ucasa App",
   "name": "ATOZAS UCASAPP - Universal Collision Avoidance System Advisory App",
+  "description": "Universal Collision Avoidance System Advisory App for real-time vehicle collision prevention",
   "icons": [
     {
       "src": "favicon.ico",
       "sizes": "64x64 32x32 24x24 16x16",
       "type": "image/x-icon",
-      "purpose": "any"
+      "purpose": "any maskable"
     },
     {
       "src": "logo192.png",
@@ -21,9 +22,14 @@
       "purpose": "any maskable"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "theme_color": "#1e3a8a",
   "background_color": "#ffffff",
-  "description": "Universal Collision Avoidance System Advisory App"
+  "categories": ["navigation", "safety", "transportation"],
+  "screenshots": [],
+  "shortcuts": [],
+  "prefer_related_applications": false
 }

@@ -61,10 +61,19 @@ const activeConnections = new Map();
 const previousDistances = new Map();
 
 // Serve static files from the React frontend build
-app.use(express.static(path.join(__dirname, "build")));
+app.use(express.static(path.join(__dirname, "build"), {
+  // Ensure service worker is served with correct MIME type
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('service-worker.js')) {
+      res.setHeader('Content-Type', 'application/javascript');
+      res.setHeader('Service-Worker-Allowed', '/');
+    }
+  }
+}));
 
+// Catch-all handler: serve index.html for client-side routing
 app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "build"));
+  res.sendFile(path.join(__dirname, "build", "index.html"));
 });
 
 // Socket connection handling
