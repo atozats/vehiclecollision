@@ -7,7 +7,7 @@ import LandingPage from "./components/LandingPage";
 import AboutLegal from "./components/AboutLegal";
 import Contact from "./components/Contact";
 import Feedback from "./components/Feedback";
-import InstallPrompt from "./components/InstallPrompt";
+import InstallPWA from "./components/InstallPWA";
 import "./App.css";
 
 // const socket = io("http://localhost:5000");
@@ -710,10 +710,10 @@ function App() {
           onClose={handleCloseAboutLegal}
           initialView={aboutLegalView}
         />
-      </main>
 
-      {/* PWA Install Prompt */}
-      <InstallPrompt />
+        {/* PWA Install Prompt */}
+        <InstallPWA />
+      </main>
     </div>
   );
 }

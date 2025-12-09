@@ -21,6 +21,31 @@ const io = socketIo(server, {
 app.use(cors());
 app.use(express.json());
 
+// PWA and Security Headers
+app.use((req, res, next) => {
+  // HTTPS redirect in production (if behind a proxy)
+  if (process.env.NODE_ENV === 'production' && req.headers['x-forwarded-proto'] !== 'https') {
+    return res.redirect('https://' + req.headers.host + req.url);
+  }
+
+  // Security headers
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  
+  // PWA Cache headers for static assets
+  if (req.url.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/)) {
+    res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1 year
+  } else if (req.url === '/service-worker.js' || req.url === '/manifest.json') {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+  
+  next();
+});
+
 // MongoDB connection
 mongoose.connect(
   process.env.MONGODB_URI || "mongodb://collisionalarm:A1b2c3d4e5vc@62.72.31.206:57423/collision-alarm?authSource=collision-alarm",
@@ -62,16 +87,29 @@ const previousDistances = new Map();
 
 // Serve static files from the React frontend build
 app.use(express.static(path.join(__dirname, "build"), {
-  // Ensure service worker is served with correct MIME type
+  maxAge: '1y',
   setHeaders: (res, filePath) => {
-    if (filePath.endsWith('service-worker.js')) {
-      res.setHeader('Content-Type', 'application/javascript');
-      res.setHeader('Service-Worker-Allowed', '/');
+    // Don't cache service worker or manifest
+    if (filePath.endsWith('service-worker.js') || filePath.endsWith('manifest.json')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     }
   }
 }));
 
-// Catch-all handler: serve index.html for client-side routing
+// Serve manifest.json with correct content type
+app.get('/manifest.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/manifest+json');
+  res.sendFile(path.join(__dirname, "build", "manifest.json"));
+});
+
+// Serve service worker with correct content type
+app.get('/service-worker.js', (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript');
+  res.setHeader('Service-Worker-Allowed', '/');
+  res.sendFile(path.join(__dirname, "build", "service-worker.js"));
+});
+
+// Catch-all route for client-side routing (must be last)
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "build", "index.html"));
 });

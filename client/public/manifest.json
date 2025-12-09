@@ -1,41 +1,32 @@
 {
-  "short_name": "Ucasa App",
-  "name": "ATOZAS UCASAPP - Universal Collision Avoidance System Advisory App",
-  "description": "Universal Collision Avoidance System Advisory App for real-time vehicle collision prevention",
+  "short_name": "UCASAAPP",
+  "name": "Universal Collision Avoidance System Advisory App",
+  "description": "Real-time collision avoidance system for vehicle safety monitoring and alerts",
   "icons": [
     {
-      "src": "/logo192.png",
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "logo192.png",
       "type": "image/png",
       "sizes": "192x192",
-      "purpose": "any"
+      "purpose": "any maskable"
     },
     {
-      "src": "/logo512.png",
+      "src": "logo512.png",
       "type": "image/png",
       "sizes": "512x512",
-      "purpose": "any"
-    },
-    {
-      "src": "/logo192.png",
-      "type": "image/png",
-      "sizes": "192x192",
-      "purpose": "maskable"
-    },
-    {
-      "src": "/logo512.png",
-      "type": "image/png",
-      "sizes": "512x512",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     }
   ],
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "theme_color": "#1e3a8a",
+  "theme_color": "#1976d2",
   "background_color": "#ffffff",
-  "categories": ["navigation", "safety", "transportation"],
-  "screenshots": [],
-  "shortcuts": [],
+  "categories": ["navigation", "utilities", "productivity"],
   "prefer_related_applications": false
 }
