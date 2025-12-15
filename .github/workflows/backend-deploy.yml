@@ -84,12 +84,60 @@ jobs:
             --exclude "node_modules" \
             server/ "$VPS_USER@$VPS_HOST:$VPS_APP_DIR/"
 
+      - name: Create .env file on server
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_APP_DIR: ${{ secrets.VPS_APP_DIR }}
+          ENVIRONMENT: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          APP_PORT: ${{ secrets.APP_PORT }}
+          NODE_ENV: ${{ secrets.NODE_ENV }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          SMTP_NAME: ${{ secrets.SMTP_NAME }}
+        run: |
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=~/.ssh/known_hosts -o ConnectTimeout=30 -o ServerAliveInterval=60 -o ServerAliveCountMax=3"
+          if [ -n "$VPS_PORT" ]; then
+            SSH_OPTS="$SSH_OPTS -p $VPS_PORT"
+          fi
+
+          echo "Creating .env file for environment..."
+          ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" bash << EOF
+          set -e
+          cd "$VPS_APP_DIR"
+          
+          # Create .env file with environment-specific variables
+          cat > .env << ENVFILE
+MONGODB_URI=${MONGODB_URI}
+PORT=${APP_PORT}
+NODE_ENV=${NODE_ENV}
+SMTP_HOST=${SMTP_HOST}
+SMTP_PORT=${SMTP_PORT}
+SMTP_SECURE=${SMTP_SECURE}
+SMTP_USER=${SMTP_USER}
+SMTP_PASSWORD=${SMTP_PASSWORD}
+SMTP_FROM=${SMTP_FROM}
+SMTP_NAME=${SMTP_NAME}
+ENVFILE
+
+          echo "✅ .env file created successfully"
+          cat .env | head -3
+          EOF
+
       - name: Install dependencies and restart Node server
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
           VPS_APP_DIR: ${{ secrets.VPS_APP_DIR }}
+          ENVIRONMENT: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
+          PM2_APP_NAME: ${{ secrets.PM2_APP_NAME }}
         run: |
           SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=~/.ssh/known_hosts -o ConnectTimeout=30 -o ServerAliveInterval=60 -o ServerAliveCountMax=3"
           if [ -n "$VPS_PORT" ]; then
@@ -98,6 +146,7 @@ jobs:
 
           ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" bash << EOF
           set -e
+          echo "Deploying to $ENVIRONMENT environment"
           echo "Using VPS_APP_DIR: $VPS_APP_DIR"
           cd "$VPS_APP_DIR"
 
@@ -109,10 +158,16 @@ jobs:
             exit 1
           fi
 
+          # Set PM2 app name (use from secret or default)
+          PM2_NAME=\${PM2_APP_NAME:-ucasaapp}
+          
           # Restart the Node process with pm2 (recommended)
           if command -v pm2 >/dev/null 2>&1; then
-            pm2 restart ucasaapp || pm2 start index.js --name ucasaapp
+            echo "Restarting PM2 app: \$PM2_NAME"
+            pm2 restart \$PM2_NAME || pm2 start index.js --name \$PM2_NAME
             pm2 save
+            echo "✅ Deployment completed successfully"
+            pm2 list
           else
             echo "pm2 is not installed. Starting Node directly (no process manager)."
             # WARNING: this will die if the VPS reboots; install pm2 for production
@@ -120,5 +175,4 @@ jobs:
             nohup node index.js >/dev/null 2>&1 &
           fi
           EOF
-
 
