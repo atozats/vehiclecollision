@@ -84,60 +84,26 @@ jobs:
             --exclude "node_modules" \
             server/ "$VPS_USER@$VPS_HOST:$VPS_APP_DIR/"
 
-      - name: Create .env file on server
-        env:
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT }}
-          VPS_APP_DIR: ${{ secrets.VPS_APP_DIR }}
-          ENVIRONMENT: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
-          MONGODB_URI: ${{ secrets.MONGODB_URI }}
-          APP_PORT: ${{ secrets.APP_PORT }}
-          NODE_ENV: ${{ secrets.NODE_ENV }}
-          SMTP_HOST: ${{ secrets.SMTP_HOST }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT }}
-          SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
-          SMTP_USER: ${{ secrets.SMTP_USER }}
-          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-          SMTP_FROM: ${{ secrets.SMTP_FROM }}
-          SMTP_NAME: ${{ secrets.SMTP_NAME }}
-        run: |
-          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=~/.ssh/known_hosts -o ConnectTimeout=30 -o ServerAliveInterval=60 -o ServerAliveCountMax=3"
-          if [ -n "$VPS_PORT" ]; then
-            SSH_OPTS="$SSH_OPTS -p $VPS_PORT"
-          fi
-
-          echo "Creating .env file for environment..."
-          ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" bash << EOF
-          set -e
-          cd "$VPS_APP_DIR"
-          
-          # Create .env file with environment-specific variables
-          cat > .env << ENVFILE
-MONGODB_URI=${MONGODB_URI}
-PORT=${APP_PORT}
-NODE_ENV=${NODE_ENV}
-SMTP_HOST=${SMTP_HOST}
-SMTP_PORT=${SMTP_PORT}
-SMTP_SECURE=${SMTP_SECURE}
-SMTP_USER=${SMTP_USER}
-SMTP_PASSWORD=${SMTP_PASSWORD}
-SMTP_FROM=${SMTP_FROM}
-SMTP_NAME=${SMTP_NAME}
-ENVFILE
-
-          echo "✅ .env file created successfully"
-          cat .env | head -3
-          EOF
-
       - name: Install dependencies and restart Node server
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
           VPS_APP_DIR: ${{ secrets.VPS_APP_DIR }}
-          ENVIRONMENT: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
-          PM2_APP_NAME: ${{ secrets.PM2_APP_NAME }}
+          # App/runtime secrets (these come from the selected GitHub Environment: development vs production)
+          NODE_ENV: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
+          PORT: ${{ secrets.PORT }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          SMTP_EMAIL: ${{ secrets.SMTP_EMAIL }}
+          SMTP_EMAIL_PASSWORD: ${{ secrets.SMTP_EMAIL_PASSWORD }}
+          SMTP_NAME: ${{ secrets.SMTP_NAME }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
+          SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+          # optional (not currently used in server/index.js, but safe to provide)
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          # Avoid pm2 name collision if dev/prod share a server
+          PM2_APP_NAME: ${{ github.ref == 'refs/heads/main' && 'ucasaapp' || 'ucasaapp-dev' }}
         run: |
           SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=~/.ssh/known_hosts -o ConnectTimeout=30 -o ServerAliveInterval=60 -o ServerAliveCountMax=3"
           if [ -n "$VPS_PORT" ]; then
@@ -146,9 +112,30 @@ ENVFILE
 
           ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" bash << EOF
           set -e
-          echo "Deploying to $ENVIRONMENT environment"
           echo "Using VPS_APP_DIR: $VPS_APP_DIR"
           cd "$VPS_APP_DIR"
+
+          # Write/update .env on the VPS from GitHub Environment secrets (do NOT echo secrets)
+          if [ -z "$MONGODB_URI" ] || [ -z "$SMTP_EMAIL" ] || [ -z "$SMTP_EMAIL_PASSWORD" ] || [ -z "$SMTP_SERVER" ] || [ -z "$SMTP_PORT" ]; then
+            echo "ERROR: Missing one or more required app secrets (MONGODB_URI / SMTP_*)."
+            echo "Please add them under: Settings -> Environments -> (development/production) -> Secrets"
+            exit 1
+          fi
+
+          umask 077
+          # Use printf to avoid YAML/heredoc indentation issues and avoid printing secrets
+          printf '%s\n' \
+            "NODE_ENV=$NODE_ENV" \
+            "PORT=$PORT" \
+            "MONGODB_URI=$MONGODB_URI" \
+            "SMTP_EMAIL=$SMTP_EMAIL" \
+            "SMTP_EMAIL_PASSWORD=$SMTP_EMAIL_PASSWORD" \
+            "SMTP_NAME=$SMTP_NAME" \
+            "SMTP_SERVER=$SMTP_SERVER" \
+            "SMTP_PORT=$SMTP_PORT" \
+            "SMTP_SECURE=$SMTP_SECURE" \
+            "SMTP_FROM=$SMTP_FROM" \
+            > .env
 
           # Install/refresh production dependencies
           if command -v npm >/dev/null 2>&1; then
@@ -158,16 +145,10 @@ ENVFILE
             exit 1
           fi
 
-          # Set PM2 app name (use from secret or default)
-          PM2_NAME=\${PM2_APP_NAME:-ucasaapp}
-          
           # Restart the Node process with pm2 (recommended)
           if command -v pm2 >/dev/null 2>&1; then
-            echo "Restarting PM2 app: \$PM2_NAME"
-            pm2 restart \$PM2_NAME || pm2 start index.js --name \$PM2_NAME
+            pm2 restart "$PM2_APP_NAME" || pm2 start index.js --name "$PM2_APP_NAME"
             pm2 save
-            echo "✅ Deployment completed successfully"
-            pm2 list
           else
             echo "pm2 is not installed. Starting Node directly (no process manager)."
             # WARNING: this will die if the VPS reboots; install pm2 for production
