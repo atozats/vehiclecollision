@@ -53,7 +53,7 @@ const LandingPage = ({ onGetStarted, onShowAboutLegal, onShowAboutLegalWithView,
       <div className="landing-container">
         <div className="landing-content">
           <div className="landing-header">
-          <div className="landing-icon">UCASA APP <span className="landing-icon-version">v1.0.0</span></div>
+          <div className="landing-icon">UCASA APP v1.0.0</div>
             <h1 className="landing-title">
             Universal Collision Avoidance System Advisory App
             </h1>
