@@ -12,7 +12,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: "https://ucasaapp.testatozas.in/",
+    origin: "https://ucasaapp.testatozas.in",
     methods: ["GET", "POST"],
   },
 });
