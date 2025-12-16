@@ -796,7 +796,7 @@ app.post("/api/feedback", async (req, res) => {
     // Send email
     const mailOptions = {
       from: process.env.SMTP_FROM || process.env.SMTP_EMAIL,
-      to: "ucasa@testatozas.in",
+      to: "feedback.ucasaapp@testatozas.in",
       subject: emailSubject,
       html: emailBody,
       replyTo: email,
