@@ -26,7 +26,7 @@ const Contact = ({ onBack }) => {
     e.preventDefault();
     setError("");
     setLoading(true);
-    
+
 
     try {
       // Determine API base URL.
@@ -35,7 +35,7 @@ const Contact = ({ onBack }) => {
       const rawApiBaseUrl =
         process.env.REACT_APP_API_URL ||
         (window.location.hostname === "localhost"
-          ? "https://ucasaapp.testatozas.in"
+          ? "https://ucasaapp.com/"
           : window.location.origin);
       const apiBaseUrl = rawApiBaseUrl.replace(/\/+$/, "");
 

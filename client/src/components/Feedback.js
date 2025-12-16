@@ -34,7 +34,7 @@ const Feedback = ({ onBack }) => {
       const rawApiBaseUrl =
         process.env.REACT_APP_API_URL ||
         (window.location.hostname === "localhost"
-          ? "https://ucasaapp.testatozas.in"
+          ? "https://ucasaapp.com/"
           : window.location.origin);
       const apiBaseUrl = rawApiBaseUrl.replace(/\/+$/, "");
 

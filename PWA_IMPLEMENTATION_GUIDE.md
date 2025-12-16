@@ -67,7 +67,7 @@ git push origin dev
 ```
 
 ### Step 3: Verify HTTPS
-✅ Your app is already running on HTTPS: `https://ucasaapp.testatozas.in`
+✅ Your app is already running on HTTPS: `https://ucasaapp.com/`
 
 PWAs **require HTTPS** to work. Your setup is already correct!
 
@@ -77,7 +77,7 @@ PWAs **require HTTPS** to work. Your setup is already correct!
 
 ### On Desktop (Chrome/Edge)
 
-1. **Visit your app**: `https://ucasaapp.testatozas.in`
+1. **Visit your app**: `https://ucasaapp.com/`
 2. **Look for install button** in the address bar (⊕ or install icon)
 3. **Or use the install banner** that appears at the bottom
 4. **Click Install** and the app will be added to your desktop

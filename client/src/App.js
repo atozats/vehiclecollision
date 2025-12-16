@@ -15,7 +15,7 @@ import "./App.css";
 const rawSocketUrl =
   process.env.REACT_APP_SOCKET_URL ||
   (window.location.hostname === "localhost"
-    ? "https://ucasaapp.testatozas.in"
+    ? "https://ucasaapp.com/"
     : window.location.origin);
 const socketUrl = rawSocketUrl.replace(/\/+$/, "");
 const socket = io(socketUrl);
@@ -98,7 +98,7 @@ function App() {
       const storedPhone = localStorage.getItem("userPhone");
       if (storedPhone) {
         try {
-          const response = await fetch(`https://ucasaapp.testatozas.in/api/user/${storedPhone}`);
+          const response = await fetch(`https://ucasaapp.com//api/user/${storedPhone}`);
           if (response.ok) {
             const result = await response.json();
             if (result.success) {
