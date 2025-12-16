@@ -792,7 +792,6 @@ app.post("/api/feedback", async (req, res) => {
       <hr>
       <p><em>Submitted at: ${new Date().toLocaleString()}</em></p>
     `;
-
     // Send email
     const mailOptions = {
       from: process.env.SMTP_FROM || process.env.SMTP_EMAIL,
