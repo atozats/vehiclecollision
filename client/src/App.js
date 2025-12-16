@@ -10,8 +10,15 @@ import Feedback from "./components/Feedback";
 import InstallPWA from "./components/InstallPWA";
 import "./App.css";
 
-// const socket = io("http://localhost:5000");
-const socket = io("https://ucasaapp.testatozas.in/");
+// Socket.IO server URL
+// Prefer env override, otherwise use same-origin in production.
+const rawSocketUrl =
+  process.env.REACT_APP_SOCKET_URL ||
+  (window.location.hostname === "localhost"
+    ? "http://localhost:7876"
+    : window.location.origin);
+const socketUrl = rawSocketUrl.replace(/\/+$/, "");
+const socket = io(socketUrl);
 
 function App() {
   const [vehicles, setVehicles] = useState([]);

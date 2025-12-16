@@ -78,6 +78,32 @@ const vehicleSchema = new mongoose.Schema({
 
 const Vehicle = mongoose.model("Vehicle", vehicleSchema);
 
+// Feedback schema (store submissions even if email fails)
+const feedbackSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true },
+  feedbackType: { type: String, required: true },
+  rating: { type: String },
+  message: { type: String, required: true },
+  ip: { type: String },
+  userAgent: { type: String },
+  createdAt: { type: Date, default: Date.now },
+});
+const Feedback = mongoose.model("Feedback", feedbackSchema);
+
+// Contact schema (store submissions even if email fails)
+const contactSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true },
+  phone: { type: String },
+  subject: { type: String, required: true },
+  message: { type: String, required: true },
+  ip: { type: String },
+  userAgent: { type: String },
+  createdAt: { type: Date, default: Date.now },
+});
+const Contact = mongoose.model("Contact", contactSchema);
+
 // Store active connections
 const activeConnections = new Map();
 
@@ -727,13 +753,6 @@ if (!transporter) {
 // Feedback endpoint
 app.post("/api/feedback", async (req, res) => {
   try {
-    if (!transporter) {
-      return res.status(503).json({
-        error:
-          "Email service is not configured on the server. Please contact the administrator.",
-      });
-    }
-
     const { name, email, feedbackType, rating, message } = req.body;
 
     // Validate required fields
@@ -771,11 +790,42 @@ app.post("/api/feedback", async (req, res) => {
       replyTo: email,
     };
 
-    await transporter.sendMail(mailOptions);
+    // Always store feedback to DB first (so user doesn't lose it even if email fails)
+    const feedbackDoc = new Feedback({
+      name,
+      email,
+      feedbackType,
+      rating,
+      message,
+      ip:
+        req.headers["x-forwarded-for"]?.toString()?.split(",")?.[0]?.trim() ||
+        req.ip,
+      userAgent: req.headers["user-agent"],
+    });
+    await feedbackDoc.save();
 
-    res.status(200).json({ 
-      success: true, 
-      message: "Feedback submitted successfully" 
+    // Email is best-effort (do not fail the request if SMTP is down)
+    if (transporter) {
+      try {
+        await transporter.sendMail(mailOptions);
+      } catch (mailError) {
+        console.error("Feedback saved but email failed:", mailError);
+        return res.status(200).json({
+          success: true,
+          message: "Feedback saved successfully (email notification failed).",
+        });
+      }
+    } else {
+      console.warn("Feedback saved; SMTP not configured, skipping email.");
+      return res.status(200).json({
+        success: true,
+        message: "Feedback saved successfully (email not configured).",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Feedback submitted successfully",
     });
   } catch (error) {
     console.error("Error sending feedback email:", error);
@@ -788,13 +838,6 @@ app.post("/api/feedback", async (req, res) => {
 // Contact endpoint
 app.post("/api/contact", async (req, res) => {
   try {
-    if (!transporter) {
-      return res.status(503).json({
-        error:
-          "Email service is not configured on the server. Please contact the administrator.",
-      });
-    }
-
     const { name, email, phone, subject, message } = req.body;
 
     // Validate required fields
@@ -832,11 +875,42 @@ app.post("/api/contact", async (req, res) => {
       replyTo: email,
     };
 
-    await transporter.sendMail(mailOptions);
+    // Always store message to DB first
+    const contactDoc = new Contact({
+      name,
+      email,
+      phone,
+      subject,
+      message,
+      ip:
+        req.headers["x-forwarded-for"]?.toString()?.split(",")?.[0]?.trim() ||
+        req.ip,
+      userAgent: req.headers["user-agent"],
+    });
+    await contactDoc.save();
 
-    res.status(200).json({ 
-      success: true, 
-      message: "Message sent successfully" 
+    // Email is best-effort
+    if (transporter) {
+      try {
+        await transporter.sendMail(mailOptions);
+      } catch (mailError) {
+        console.error("Contact saved but email failed:", mailError);
+        return res.status(200).json({
+          success: true,
+          message: "Message saved successfully (email notification failed).",
+        });
+      }
+    } else {
+      console.warn("Contact saved; SMTP not configured, skipping email.");
+      return res.status(200).json({
+        success: true,
+        message: "Message saved successfully (email not configured).",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Message sent successfully",
     });
   } catch (error) {
     console.error("Error sending contact email:", error);

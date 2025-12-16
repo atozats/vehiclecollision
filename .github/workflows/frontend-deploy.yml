@@ -62,7 +62,7 @@ jobs:
           set -e
 
           echo "🚀 Deploying from branch: $BRANCH_NAME to environment: $ENVIRONMENT"
-          
+
           # Basic validation so failures clearly point to missing secrets
           if [ -z "$SSH_KEY" ] || [ -z "$VPS_USER" ] || [ -z "$VPS_HOST" ] || [ -z "$VPS_APP_DIR" ]; then
             echo "ERROR: One or more required VPS_* secrets are missing or empty."

@@ -28,12 +28,14 @@ const Feedback = ({ onBack }) => {
     setLoading(true);
 
     try {
-      // Determine API base URL (and normalize trailing slashes)
+      // Determine API base URL.
+      // IMPORTANT: CRA env vars are baked at build-time. In production we prefer same-origin
+      // so the deployed frontend always talks to the same domain automatically.
       const rawApiBaseUrl =
         process.env.REACT_APP_API_URL ||
         (window.location.hostname === "localhost"
-          ? "http://localhost:5000"
-          : "https://ucasaapp.testatozas.in");
+          ? "http://localhost:7876"
+          : window.location.origin);
       const apiBaseUrl = rawApiBaseUrl.replace(/\/+$/, "");
 
       const response = await fetch(`${apiBaseUrl}/api/feedback`, {
