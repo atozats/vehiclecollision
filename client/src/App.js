@@ -15,7 +15,7 @@ import "./App.css";
 const rawSocketUrl =
   process.env.REACT_APP_SOCKET_URL ||
   (window.location.hostname === "localhost"
-    ? "http://localhost:7876"
+    ? "https://ucasaapp.testatozas.in"
     : window.location.origin);
 const socketUrl = rawSocketUrl.replace(/\/+$/, "");
 const socket = io(socketUrl);

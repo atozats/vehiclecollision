@@ -12,7 +12,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: "https://ucasaapp.testatozas.in",
+    origin: "http://localhost:3000",
     methods: ["GET", "POST"],
   },
 });
@@ -745,8 +745,20 @@ if (!transporter) {
 } else {
   // Verify in background (doesn't crash server if SMTP is temporarily unreachable)
   transporter.verify().then(
-    () => console.log("SMTP transporter verified"),
-    (err) => console.warn("SMTP transporter verify failed:", err?.message || err)
+    () => console.log(`✅ SMTP transporter verified successfully (${process.env.SMTP_SERVER}:${process.env.SMTP_PORT})`),
+    (err) => {
+      console.error("❌ SMTP transporter verify failed!");
+      console.error(`   Server: ${process.env.SMTP_SERVER}:${process.env.SMTP_PORT}`);
+      console.error(`   Email: ${process.env.SMTP_EMAIL}`);
+      console.error(`   Secure: ${process.env.SMTP_SECURE === "true" ? "Yes (TLS)" : "No (STARTTLS)"}`);
+      console.error(`   Error: ${err?.message || err}`);
+      console.error("\n   Troubleshooting:");
+      console.error("   1. Check SMTP_EMAIL and SMTP_EMAIL_PASSWORD are correct");
+      console.error("   2. For Gmail: Use App Password (not regular password)");
+      console.error("   3. Check SMTP_SECURE: 'true' for port 465, 'false' for port 587");
+      console.error("   4. Verify SMTP_SERVER and SMTP_PORT are correct");
+      console.error("   5. Some servers require SMTP_NAME to match your domain");
+    }
   );
 }
 
@@ -933,7 +945,7 @@ app.post("/api/contact", async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 7876;
+const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
