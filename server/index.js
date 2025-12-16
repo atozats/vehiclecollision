@@ -791,18 +791,26 @@ app.post("/api/feedback", async (req, res) => {
     };
 
     // Always store feedback to DB first (so user doesn't lose it even if email fails)
-    const feedbackDoc = new Feedback({
-      name,
-      email,
-      feedbackType,
-      rating,
-      message,
-      ip:
-        req.headers["x-forwarded-for"]?.toString()?.split(",")?.[0]?.trim() ||
-        req.ip,
-      userAgent: req.headers["user-agent"],
-    });
-    await feedbackDoc.save();
+    try {
+      const feedbackDoc = new Feedback({
+        name,
+        email,
+        feedbackType,
+        rating: rating || undefined,
+        message,
+        ip:
+          req.headers["x-forwarded-for"]?.toString()?.split(",")?.[0]?.trim() ||
+          req.ip ||
+          "unknown",
+        userAgent: req.headers["user-agent"] || "unknown",
+      });
+      await feedbackDoc.save();
+      console.log("Feedback saved to database:", feedbackDoc._id);
+    } catch (dbError) {
+      console.error("Error saving feedback to database:", dbError);
+      // Continue anyway - try to send email even if DB save fails
+      // But log the error for debugging
+    }
 
     // Email is best-effort (do not fail the request if SMTP is down)
     if (transporter) {
@@ -828,9 +836,14 @@ app.post("/api/feedback", async (req, res) => {
       message: "Feedback submitted successfully",
     });
   } catch (error) {
-    console.error("Error sending feedback email:", error);
+    console.error("Error in /api/feedback endpoint:", error);
+    console.error("Error stack:", error.stack);
+    // Return more detailed error in development, generic in production
+    const errorMessage = process.env.NODE_ENV === 'development' 
+      ? `Failed to submit feedback: ${error.message}` 
+      : "Failed to submit feedback. Please try again later.";
     res.status(500).json({ 
-      error: "Failed to submit feedback. Please try again later." 
+      error: errorMessage 
     });
   }
 });
