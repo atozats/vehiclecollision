@@ -150,6 +150,7 @@ function App() {
       isSimulated: true,
     };
 
+    
     console.log(`Simulated location for ${userData.name}:`, simulatedLocation);
     handleLocationUpdate(simulatedLocation);
 
