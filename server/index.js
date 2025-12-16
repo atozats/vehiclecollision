@@ -690,23 +690,50 @@ app.post("/api/vehicles", async (req, res) => {
 });
 
 // Nodemailer transporter configuration
-const transporter = nodemailer.createTransport({
-  name: process.env.SMTP_NAME,
-  host: process.env.SMTP_SERVER,
-  port: parseInt(process.env.SMTP_PORT),
-  secure: process.env.SMTP_SECURE === 'true',
-  auth: {
-    user: process.env.SMTP_EMAIL,
-    pass: process.env.SMTP_EMAIL_PASSWORD,
-  },
-  tls: {
-    rejectUnauthorized: false, // Bypass hostname mismatch
-  },
-});
+const isSmtpConfigured =
+  !!process.env.SMTP_SERVER &&
+  !!process.env.SMTP_PORT &&
+  !!process.env.SMTP_EMAIL &&
+  !!process.env.SMTP_EMAIL_PASSWORD;
+
+const transporter = isSmtpConfigured
+  ? nodemailer.createTransport({
+      name: process.env.SMTP_NAME,
+      host: process.env.SMTP_SERVER,
+      port: parseInt(process.env.SMTP_PORT, 10),
+      secure: process.env.SMTP_SECURE === "true",
+      auth: {
+        user: process.env.SMTP_EMAIL,
+        pass: process.env.SMTP_EMAIL_PASSWORD,
+      },
+      tls: {
+        rejectUnauthorized: false, // Bypass hostname mismatch
+      },
+    })
+  : null;
+
+if (!transporter) {
+  console.warn(
+    "SMTP is not configured. Feedback/Contact email endpoints will return 503. Missing one of: SMTP_SERVER, SMTP_PORT, SMTP_EMAIL, SMTP_EMAIL_PASSWORD"
+  );
+} else {
+  // Verify in background (doesn't crash server if SMTP is temporarily unreachable)
+  transporter.verify().then(
+    () => console.log("SMTP transporter verified"),
+    (err) => console.warn("SMTP transporter verify failed:", err?.message || err)
+  );
+}
 
 // Feedback endpoint
 app.post("/api/feedback", async (req, res) => {
   try {
+    if (!transporter) {
+      return res.status(503).json({
+        error:
+          "Email service is not configured on the server. Please contact the administrator.",
+      });
+    }
+
     const { name, email, feedbackType, rating, message } = req.body;
 
     // Validate required fields
@@ -761,6 +788,13 @@ app.post("/api/feedback", async (req, res) => {
 // Contact endpoint
 app.post("/api/contact", async (req, res) => {
   try {
+    if (!transporter) {
+      return res.status(503).json({
+        error:
+          "Email service is not configured on the server. Please contact the administrator.",
+      });
+    }
+
     const { name, email, phone, subject, message } = req.body;
 
     // Validate required fields
@@ -792,7 +826,7 @@ app.post("/api/contact", async (req, res) => {
     // Send email
     const mailOptions = {
       from: process.env.SMTP_FROM || process.env.SMTP_EMAIL,
-      to: "ucasa@testatozas.in",
+      to: "feedback.ucasaapp@testatozas.in",
       subject: emailSubject,
       html: emailBody,
       replyTo: email,

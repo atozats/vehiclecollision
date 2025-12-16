@@ -28,11 +28,13 @@ const Feedback = ({ onBack }) => {
     setLoading(true);
 
     try {
-      // Determine API base URL
-      const apiBaseUrl = process.env.REACT_APP_API_URL || 
-                        (window.location.hostname === 'localhost' 
-                          ? 'http://localhost:5000' 
-                          : 'https://ucasaapp.testatozas.in');
+      // Determine API base URL (and normalize trailing slashes)
+      const rawApiBaseUrl =
+        process.env.REACT_APP_API_URL ||
+        (window.location.hostname === "localhost"
+          ? "http://localhost:5000"
+          : "https://ucasaapp.testatozas.in");
+      const apiBaseUrl = rawApiBaseUrl.replace(/\/+$/, "");
 
       const response = await fetch(`${apiBaseUrl}/api/feedback`, {
         method: 'POST',

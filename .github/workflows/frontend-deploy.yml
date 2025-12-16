@@ -22,13 +22,19 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          # CRA (react-scripts 5) is most stable on Node 18 LTS in CI
+          node-version: "18"
           cache: "npm"
           cache-dependency-path: client/package-lock.json
 
+      - name: Show Node/npm versions
+        run: |
+          node -v
+          npm -v
+
       - name: Install frontend dependencies
         working-directory: client
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Build frontend
         working-directory: client
@@ -36,6 +42,12 @@ jobs:
           # Prevent Create React App from treating lint warnings as build errors in CI
           CI: "false"
         run: npm run build
+
+      - name: Verify build output exists
+        working-directory: client
+        run: |
+          test -d build
+          ls -la build | head -50
 
       - name: Deploy build to VPS
         env:
