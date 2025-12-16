@@ -26,6 +26,7 @@ const Contact = ({ onBack }) => {
     e.preventDefault();
     setError("");
     setLoading(true);
+    
 
     try {
       // Determine API base URL.
