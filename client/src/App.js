@@ -91,6 +91,7 @@ function App() {
     };
   }, []);
 
+  
   // Check if user is already registered in database
   useEffect(() => {
     const checkExistingUser = async () => {

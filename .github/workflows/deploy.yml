@@ -1,25 +1,50 @@
-name: Deploy Backend
+name: Deploy Application
 
 on:
   push:
     branches:
-      - main
-      - master
-      - dev
+      - ucasaappmain_testCICD_final_deploy
+      - ucasaapp_testCICD_testSite_deploy
     paths:
+      - "client/**"
       - "server/**"
-      - ".github/workflows/backend-deploy.yml"
+      - ".github/workflows/deploy.yml"
 
 jobs:
-  deploy-backend:
+  deploy:
     runs-on: ubuntu-latest
-    environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
+    environment: ${{ github.ref == 'refs/heads/ucasaappmain_testCICD_final_deploy' && 'production' || 'development' }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Prepare SSH
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: client/package-lock.json
+
+      - name: Show Node/npm versions
+        run: |
+          node -v
+          npm -v
+
+      - name: Build Frontend
+        working-directory: client
+        env:
+          CI: "false"
+        run: |
+          echo "📦 Installing frontend dependencies..."
+          npm ci --legacy-peer-deps
+          echo "🏗️ Building frontend..."
+          npm run build
+          echo "✅ Frontend build completed"
+          test -d build
+          ls -la build | head -20
+
+      - name: Prepare SSH and Deploy
         env:
           SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -27,71 +52,9 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT }}
           VPS_APP_DIR: ${{ secrets.VPS_APP_DIR }}
           BRANCH_NAME: ${{ github.ref_name }}
-          ENVIRONMENT: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
-        run: |
-          set -e
-
-          echo "🚀 Deploying from branch: $BRANCH_NAME to environment: $ENVIRONMENT"
-          
-          # Basic validation so failures clearly point to missing secrets
-          if [ -z "$SSH_KEY" ] || [ -z "$VPS_USER" ] || [ -z "$VPS_HOST" ] || [ -z "$VPS_APP_DIR" ]; then
-            echo "ERROR: One or more required VPS_* secrets are missing or empty."
-            echo "  VPS_SSH_KEY set?  -> $([ -n "$SSH_KEY" ] && echo yes || echo no)"
-            echo "  VPS_USER set?     -> $([ -n "$VPS_USER" ] && echo yes || echo no)"
-            echo "  VPS_HOST set?     -> $([ -n "$VPS_HOST" ] && echo yes || echo no)"
-            echo "  VPS_APP_DIR set?  -> $([ -n "$VPS_APP_DIR" ] && echo yes || echo no)"
-            echo "  VPS_PORT (opt)?   -> $([ -n "$VPS_PORT" ] && echo yes || echo no)"
-            exit 1
-          fi
-
-          
-          PORT_OPT=""
-          if [ -n "$VPS_PORT" ]; then
-            PORT_OPT="-p $VPS_PORT"
-          fi
-
-          echo "Preparing SSH for $VPS_USER@$VPS_HOST (port: ${VPS_PORT:-22})"
-
-          mkdir -p ~/.ssh
-          echo "$SSH_KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          
-          # Configure SSH options for better connection handling
-          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=~/.ssh/known_hosts -o ConnectTimeout=30 -o ServerAliveInterval=60 -o ServerAliveCountMax=3"
-          if [ -n "$VPS_PORT" ]; then
-            SSH_OPTS="$SSH_OPTS -p $VPS_PORT"
-          fi
-          
-          # ssh-keyscan may fail if firewall blocks it; don't fail the whole job for that
-          ssh-keyscan $([ -n "$VPS_PORT" ] && echo "-p $VPS_PORT") -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null || \
-            echo "Warning: ssh-keyscan failed, continuing without pre-populated known_hosts"
-
-          # Test SSH connection first
-          echo "Testing SSH connection..."
-          ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" "echo 'SSH connection successful'" || {
-            echo "ERROR: Failed to establish SSH connection to $VPS_HOST"
-            echo "Please verify:"
-            echo "  1. VPS_HOST is correct: $VPS_HOST"
-            echo "  2. VPS_PORT is correct: ${VPS_PORT:-22}"
-            echo "  3. VPS firewall allows connections from GitHub Actions IPs"
-            echo "  4. SSH service is running on the VPS"
-            exit 1
-          }
-
-          # Sync backend code to VPS (without node_modules)
-          echo "Syncing backend files to VPS..."
-          rsync -az --delete -e "ssh $SSH_OPTS" \
-            --exclude "node_modules" \
-            server/ "$VPS_USER@$VPS_HOST:$VPS_APP_DIR/"
-
-      - name: Install dependencies and restart Node server
-        env:
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT }}
-          VPS_APP_DIR: ${{ secrets.VPS_APP_DIR }}
-          # App/runtime secrets (these come from the selected GitHub Environment: development vs production)
-          NODE_ENV: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
+          ENVIRONMENT: ${{ github.ref == 'refs/heads/ucasaappmain_testCICD_final_deploy' && 'production' || 'development' }}
+          # App/runtime secrets (from GitHub Environment: development vs production)
+          NODE_ENV: ${{ github.ref == 'refs/heads/ucasaappmain_testCICD_final_deploy' && 'production' || 'development' }}
           PORT: ${{ secrets.PORT }}
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           SMTP_EMAIL: ${{ secrets.SMTP_EMAIL }}
@@ -100,10 +63,79 @@ jobs:
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
           SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
           SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
-          # optional (not currently used in server/index.js, but safe to provide)
           SMTP_FROM: ${{ secrets.SMTP_FROM }}
-          # Avoid pm2 name collision if dev/prod share a server
-          PM2_APP_NAME: ${{ github.ref == 'refs/heads/main' && 'ucasaapp' || 'ucasaapp-dev' }}
+          PM2_APP_NAME: ${{ github.ref == 'refs/heads/ucasaappmain_testCICD_final_deploy' && 'ucasaapp' || 'ucasaapp-test' }}
+        run: |
+          set -e
+
+          echo "🚀 Deploying from branch: $BRANCH_NAME to environment: $ENVIRONMENT"
+
+          # Basic validation
+          if [ -z "$SSH_KEY" ] || [ -z "$VPS_USER" ] || [ -z "$VPS_HOST" ] || [ -z "$VPS_APP_DIR" ]; then
+            echo "ERROR: One or more required VPS_* secrets are missing or empty."
+            echo "  VPS_SSH_KEY set?  -> $([ -n "$SSH_KEY" ] && echo yes || echo no)"
+            echo "  VPS_USER set?     -> $([ -n "$VPS_USER" ] && echo yes || echo no)"
+            echo "  VPS_HOST set?     -> $([ -n "$VPS_HOST" ] && echo yes || echo no)"
+            echo "  VPS_APP_DIR set?  -> $([ -n "$VPS_APP_DIR" ] && echo yes || echo no)"
+            exit 1
+          fi
+
+          PORT_OPT=""
+          if [ -n "$VPS_PORT" ]; then
+            PORT_OPT="-p $VPS_PORT"
+          fi
+
+          echo "🔐 Preparing SSH for $VPS_USER@$VPS_HOST (port: ${VPS_PORT:-22})"
+
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=~/.ssh/known_hosts -o ConnectTimeout=30 -o ServerAliveInterval=60 -o ServerAliveCountMax=3"
+          if [ -n "$VPS_PORT" ]; then
+            SSH_OPTS="$SSH_OPTS -p $VPS_PORT"
+          fi
+          
+          ssh-keyscan $([ -n "$VPS_PORT" ] && echo "-p $VPS_PORT") -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null || \
+            echo "Warning: ssh-keyscan failed, continuing without pre-populated known_hosts"
+
+          # Test SSH connection
+          echo "🔍 Testing SSH connection..."
+          ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" "echo 'SSH connection successful'" || {
+            echo "ERROR: Failed to establish SSH connection to $VPS_HOST"
+            exit 1
+          }
+
+          # Deploy Frontend Build
+          echo "📤 Deploying frontend build to VPS..."
+          ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" "mkdir -p $VPS_APP_DIR/build"
+          rsync -az --delete -e "ssh $SSH_OPTS" client/build/ "$VPS_USER@$VPS_HOST:$VPS_APP_DIR/build/"
+          echo "✅ Frontend deployed successfully"
+
+          # Deploy Backend Code
+          echo "📤 Deploying backend code to VPS..."
+          rsync -az --delete -e "ssh $SSH_OPTS" \
+            --exclude "node_modules" \
+            server/ "$VPS_USER@$VPS_HOST:$VPS_APP_DIR/"
+          echo "✅ Backend code deployed successfully"
+
+      - name: Install Dependencies and Restart Server
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_APP_DIR: ${{ secrets.VPS_APP_DIR }}
+          NODE_ENV: ${{ github.ref == 'refs/heads/ucasaappmain_testCICD_final_deploy' && 'production' || 'development' }}
+          PORT: ${{ secrets.PORT }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          SMTP_EMAIL: ${{ secrets.SMTP_EMAIL }}
+          SMTP_EMAIL_PASSWORD: ${{ secrets.SMTP_EMAIL_PASSWORD }}
+          SMTP_NAME: ${{ secrets.SMTP_NAME }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
+          SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          PM2_APP_NAME: ${{ github.ref == 'refs/heads/ucasaappmain_testCICD_final_deploy' && 'ucasaapp' || 'ucasaapp-test' }}
         run: |
           SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=~/.ssh/known_hosts -o ConnectTimeout=30 -o ServerAliveInterval=60 -o ServerAliveCountMax=3"
           if [ -n "$VPS_PORT" ]; then
@@ -112,18 +144,19 @@ jobs:
 
           ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" bash << EOF
           set -e
-          echo "Using VPS_APP_DIR: $VPS_APP_DIR"
+          echo "📂 Using VPS_APP_DIR: $VPS_APP_DIR"
           cd "$VPS_APP_DIR"
 
-          # Write/update .env on the VPS from GitHub Environment secrets (do NOT echo secrets)
+          # Validate required secrets
           if [ -z "$MONGODB_URI" ] || [ -z "$SMTP_EMAIL" ] || [ -z "$SMTP_EMAIL_PASSWORD" ] || [ -z "$SMTP_SERVER" ] || [ -z "$SMTP_PORT" ]; then
             echo "ERROR: Missing one or more required app secrets (MONGODB_URI / SMTP_*)."
             echo "Please add them under: Settings -> Environments -> (development/production) -> Secrets"
             exit 1
           fi
 
+          # Write .env file from GitHub Environment secrets
+          echo "📝 Creating .env file..."
           umask 077
-          # Use printf to avoid YAML/heredoc indentation issues and avoid printing secrets
           printf '%s\n' \
             "NODE_ENV=$NODE_ENV" \
             "PORT=$PORT" \
@@ -136,24 +169,39 @@ jobs:
             "SMTP_SECURE=$SMTP_SECURE" \
             "SMTP_FROM=$SMTP_FROM" \
             > .env
+          echo "✅ .env file created"
 
-          # Install/refresh production dependencies
+          # Install backend dependencies
+          echo "📦 Installing backend dependencies..."
           if command -v npm >/dev/null 2>&1; then
+            echo "Node.js version: $(node --version)"
+            echo "npm version: $(npm --version)"
             npm ci --omit=dev
+            echo "✅ Dependencies installed"
           else
-            echo "npm is not installed on the VPS. Please install Node.js and npm."
+            echo "❌ ERROR: npm is not installed on the VPS."
+            echo "Please install Node.js:"
+            echo "  curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -"
+            echo "  sudo apt install -y nodejs"
             exit 1
           fi
 
-          # Restart the Node process with pm2 (recommended)
+          # Restart server with PM2
+          echo "🔄 Restarting server..."
           if command -v pm2 >/dev/null 2>&1; then
             pm2 restart "$PM2_APP_NAME" || pm2 start index.js --name "$PM2_APP_NAME"
             pm2 save
+            echo "✅ Server restarted with PM2 (name: $PM2_APP_NAME)"
           else
-            echo "pm2 is not installed. Starting Node directly (no process manager)."
-            # WARNING: this will die if the VPS reboots; install pm2 for production
-            # You can replace this with a systemd service if you prefer.
+            echo "⚠️ pm2 is not installed. Starting Node directly (no process manager)."
             nohup node index.js >/dev/null 2>&1 &
+            echo "✅ Server started (without PM2)"
           fi
           EOF
+
+          echo ""
+          echo "🎉 Deployment completed successfully!"
+          echo "   Branch: ${{ github.ref_name }}"
+          echo "   Environment: ${{ github.ref == 'refs/heads/ucasaappmain_testCICD_final_deploy' && 'production' || 'development' }}"
+          echo "   PM2 App: ${{ github.ref == 'refs/heads/ucasaappmain_testCICD_final_deploy' && 'ucasaapp' || 'ucasaapp-test' }}"
 
