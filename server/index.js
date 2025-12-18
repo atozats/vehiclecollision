@@ -800,6 +800,7 @@ app.post("/api/feedback", async (req, res) => {
       html: emailBody,
       replyTo: email,
     };
+    
     // Always store feedback to DB first (so user doesn't lose it even if email fails)
     try {
       const feedbackDoc = new Feedback({
