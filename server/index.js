@@ -795,12 +795,11 @@ app.post("/api/feedback", async (req, res) => {
     // Send email
     const mailOptions = {
       from: process.env.SMTP_FROM || process.env.SMTP_EMAIL,
-      to: "feedback.ucasaapp@testatozas.in",
+      to: "feedback.ucasaapp@atozasindia.in",
       subject: emailSubject,
       html: emailBody,
       replyTo: email,
     };
-
     
     // Always store feedback to DB first (so user doesn't lose it even if email fails)
     try {
@@ -894,7 +893,7 @@ app.post("/api/contact", async (req, res) => {
     // Send email
     const mailOptions = {
       from: process.env.SMTP_FROM || process.env.SMTP_EMAIL,
-      to: "feedback.ucasaapp@testatozas.in",
+      to: "feedback.ucasaapp@atozasindia.in",
       subject: emailSubject,
       html: emailBody,
       replyTo: email,

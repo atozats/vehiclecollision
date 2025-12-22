@@ -200,16 +200,17 @@ const LandingPage = ({ onGetStarted, onShowAboutLegal, onShowAboutLegalWithView,
               <div className="footer-section">
                 <h4 className="footer-links-title">Support</h4>
                 <ul className="footer-links">
-                  <li>
+                  {/* <li>
                     <a href="#" onClick={handleContact} className="footer-link">
                       Contact Us
                     </a>
-                  </li>
+                  </li> */}
                   <li>
                     <a href="#" onClick={handleFeedback} className="footer-link">
                       Feedback
                     </a>
                   </li>
+                  <li><p>support.ummaapp@atozasindia.in</p></li>
                 </ul>
               </div>
             </div>

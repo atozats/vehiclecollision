@@ -90,7 +90,7 @@ function App() {
       clearInterval(usersInterval);
     };
   }, []);
-
+  
   // Check if user is already registered in database
   useEffect(() => {
     const checkExistingUser = async () => {
