@@ -172,20 +172,32 @@ jobs:
             > .env
           echo "✅ .env file created"
 
-          # Install backend dependencies
-          echo "📦 Installing backend dependencies..."
-          if command -v npm >/dev/null 2>&1; then
-            echo "Node.js version: $(node --version)"
-            echo "npm version: $(npm --version)"
-            npm ci --omit=dev
-            echo "✅ Dependencies installed"
-          else
-            echo "❌ ERROR: npm is not installed on the VPS."
-            echo "Please install Node.js:"
-            echo "  curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -"
-            echo "  sudo apt install -y nodejs"
+          # Check Node.js installation
+          echo "🔍 Checking Node.js installation..."
+          if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+            echo "❌ ERROR: Node.js and/or npm is not installed on the VPS."
+            echo ""
+            echo "📋 To fix this, SSH to your VPS and run:"
+            echo "   ssh $VPS_USER@$VPS_HOST"
+            echo ""
+            echo "   Then install Node.js 20.x:"
+            echo "   curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -"
+            echo "   sudo apt install -y nodejs"
+            echo ""
+            echo "   Verify installation:"
+            echo "   node --version"
+            echo "   npm --version"
+            echo ""
+            echo "   See INSTALL_NODEJS_VPS.md for detailed instructions."
             exit 1
           fi
+
+          # Install backend dependencies
+          echo "📦 Installing backend dependencies..."
+          echo "Node.js version: $(node --version)"
+          echo "npm version: $(npm --version)"
+          npm ci --omit=dev
+          echo "✅ Dependencies installed"
 
           # Restart server with PM2
           echo "🔄 Restarting server..."
