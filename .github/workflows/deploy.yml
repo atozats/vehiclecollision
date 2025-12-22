@@ -172,61 +172,20 @@ jobs:
             > .env
           echo "✅ .env file created"
 
-          # Check Node.js installation
-          echo "🔍 Checking Node.js installation..."
-          if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
-            echo "⚠️  Node.js and/or npm is not installed on the VPS."
-            echo ""
-            
-            # Try automatic installation if sudo is available (passwordless sudo required)
-            if sudo -n true 2>/dev/null; then
-              echo "🔧 Attempting automatic Node.js installation..."
-              echo "📦 Updating package list..."
-              sudo apt update -qq || true
-              
-              echo "📥 Installing Node.js 20.x..."
-              if curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt install -y nodejs; then
-                echo "✅ Node.js installed successfully!"
-                echo "Node.js version: $(node --version)"
-                echo "npm version: $(npm --version)"
-              else
-                echo "❌ Automatic installation failed. Please install manually."
-                echo ""
-                echo "📋 SSH to your VPS and run:"
-                echo "   ssh $VPS_USER@$VPS_HOST"
-                echo "   curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -"
-                echo "   sudo apt install -y nodejs"
-                exit 1
-              fi
-            else
-              echo "❌ Sudo access not available for automatic installation."
-              echo ""
-              echo "📋 To fix this, SSH to your VPS and run:"
-              echo "   ssh $VPS_USER@$VPS_HOST"
-              echo ""
-              echo "   Then install Node.js 20.x:"
-              echo "   curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -"
-              echo "   sudo apt install -y nodejs"
-              echo ""
-              echo "   Verify installation:"
-              echo "   node --version"
-              echo "   npm --version"
-              echo ""
-              echo "   See INSTALL_NODEJS_VPS.md for detailed instructions."
-              exit 1
-            fi
-          else
-            echo "✅ Node.js is installed"
-            echo "Node.js version: $(node --version)"
-            echo "npm version: $(npm --version)"
-          fi
-
           # Install backend dependencies
           echo "📦 Installing backend dependencies..."
-          echo "Node.js version: $(node --version)"
-          echo "npm version: $(npm --version)"
-          npm ci --omit=dev
-          echo "✅ Dependencies installed"
+          if command -v npm >/dev/null 2>&1; then
+            echo "Node.js version: $(node --version)"
+            echo "npm version: $(npm --version)"
+            npm ci --omit=dev
+            echo "✅ Dependencies installed"
+          else
+            echo "❌ ERROR: npm is not installed on the VPS."
+            echo "Please install Node.js:"
+            echo "  curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -"
+            echo "  sudo apt install -y nodejs"
+            exit 1
+          fi
 
           # Restart server with PM2
           echo "🔄 Restarting server..."
