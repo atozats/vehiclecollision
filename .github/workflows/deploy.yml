@@ -143,7 +143,12 @@ jobs:
             SSH_OPTS="$SSH_OPTS -p $VPS_PORT"
           fi
 
-          ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" bash << EOF
+          # NOTE: use a *quoted* heredoc so $HOME and other vars resolve on the VPS (not on the GitHub runner).
+          # Pass required values explicitly to the remote shell.
+          REMOTE_ENV=$(printf 'VPS_APP_DIR=%q NODE_ENV=%q PORT=%q MONGODB_URI=%q SMTP_EMAIL=%q SMTP_EMAIL_PASSWORD=%q SMTP_NAME=%q SMTP_PORT=%q SMTP_SECURE=%q SMTP_SERVER=%q SMTP_FROM=%q PM2_APP_NAME=%q' \
+            "$VPS_APP_DIR" "$NODE_ENV" "$PORT" "$MONGODB_URI" "$SMTP_EMAIL" "$SMTP_EMAIL_PASSWORD" "$SMTP_NAME" "$SMTP_PORT" "$SMTP_SECURE" "$SMTP_SERVER" "$SMTP_FROM" "$PM2_APP_NAME")
+
+          ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" "$REMOTE_ENV bash -s" << 'EOF'
           set -e
           echo "📂 Using VPS_APP_DIR: $VPS_APP_DIR"
           cd "$VPS_APP_DIR"
