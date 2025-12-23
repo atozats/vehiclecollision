@@ -180,26 +180,35 @@ jobs:
 
             echo "🛠️ Node.js/npm not found on VPS. Attempting to install..."
 
-            if ! command -v apt-get >/dev/null 2>&1; then
-              echo "❌ Cannot auto-install: apt-get not found on VPS."
+            # Prefer system install when we can use non-interactive sudo (typical CI deploy user)
+            if command -v apt-get >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+              sudo -n apt-get update
+              sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl gnupg
+              curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -n -E bash -
+              sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs
+              return 0
+            fi
+
+            # Fallback: install Node.js without sudo via nvm (installs under $HOME)
+            echo "ℹ️ Falling back to nvm (no-sudo) install..."
+            if ! command -v curl >/dev/null 2>&1; then
+              echo "❌ Cannot install via nvm: curl not found on VPS."
               return 1
             fi
 
-            if ! command -v sudo >/dev/null 2>&1; then
-              echo "❌ Cannot auto-install: sudo not available on VPS."
-              return 1
+            export NVM_DIR="$HOME/.nvm"
+            if [ ! -s "$NVM_DIR/nvm.sh" ]; then
+              echo "⬇️ Installing nvm..."
+              curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
             fi
 
-            # Non-interactive sudo required for CI
-            sudo -n true 2>/dev/null || {
-              echo "❌ Cannot auto-install: sudo requires a password (non-interactive sudo not enabled)."
-              return 1
-            }
+            # shellcheck disable=SC1090
+            . "$NVM_DIR/nvm.sh"
+            nvm install 18
+            nvm use 18
+            hash -r
 
-            sudo -n apt-get update
-            sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl gnupg
-            curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -n -E bash -
-            sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs
+            command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1
           }
 
           if ! ensure_node; then
@@ -234,6 +243,15 @@ jobs:
               pm2 start index.js --name "$PM2_APP_NAME"
               pm2 save
               echo "✅ Server started with PM2 (name: $PM2_APP_NAME)"
+            elif command -v npm >/dev/null 2>&1; then
+              echo "🛠️ Installing pm2 under user prefix (no sudo)..."
+              export NPM_CONFIG_PREFIX="$HOME/.npm-global"
+              export PATH="$NPM_CONFIG_PREFIX/bin:$PATH"
+              mkdir -p "$NPM_CONFIG_PREFIX"
+              npm i -g pm2
+              pm2 start index.js --name "$PM2_APP_NAME"
+              pm2 save
+              echo "✅ Server started with PM2 (user install, name: $PM2_APP_NAME)"
             else
               echo "➡️ Starting Node directly (no process manager)."
               nohup node index.js >/dev/null 2>&1 &
