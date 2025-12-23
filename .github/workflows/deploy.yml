@@ -9,6 +9,7 @@ on:
       - "client/**"
       - "server/**"
       - ".github/workflows/deploy.yml"
+  workflow_dispatch:
 
 jobs:
   deploy:

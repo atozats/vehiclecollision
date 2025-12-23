@@ -47,6 +47,7 @@ app.use((req, res, next) => {
   next();
 });
 
+
 // MongoDB connection
 mongoose.connect(
   process.env.MONGODB_URI || "mongodb://collisionalarm:A1b2c3d4e5vc@62.72.31.206:57423/collision-alarm?authSource=collision-alarm",
