@@ -91,7 +91,7 @@ function App() {
     };
   }, []);
   
-  // Check if user is already registered in database
+  // Check if user is already registered in databasee
   useEffect(() => {
     const checkExistingUser = async () => {
       // Try to get user from a stored phone number
