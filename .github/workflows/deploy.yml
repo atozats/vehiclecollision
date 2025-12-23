@@ -116,6 +116,7 @@ jobs:
           echo "📤 Deploying backend code to VPS..."
           rsync -az --delete -e "ssh $SSH_OPTS" \
             --exclude "node_modules" \
+            --exclude "build" \
             server/ "$VPS_USER@$VPS_HOST:$VPS_APP_DIR/"
           echo "✅ Backend code deployed successfully"
 
