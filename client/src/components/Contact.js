@@ -13,6 +13,7 @@ const Contact = ({ onBack }) => {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -32,12 +33,14 @@ const Contact = ({ onBack }) => {
       // Determine API base URL.
       // IMPORTANT: CRA env vars are baked at build-time. In production we prefer same-origin
       // so the deployed frontend always talks to the same domain automatically.
+      // Local dev: default to local backend (no proxy configured in client/package.json).
+      // Production: same-origin.
       const rawApiBaseUrl =
         process.env.REACT_APP_API_URL ||
         (window.location.hostname === "localhost"
-          ? "https://ucasaapp.com/"
+          ? "http://localhost:5000"
           : window.location.origin);
-      const apiBaseUrl = rawApiBaseUrl.replace(/\/+$/, "");
+      const apiBaseUrl = (rawApiBaseUrl || "").replace(/\/+$/, "");
 
       const response = await fetch(`${apiBaseUrl}/api/contact`, {
         method: 'POST',
@@ -54,6 +57,21 @@ const Contact = ({ onBack }) => {
       }
 
       // Show success message
+      const debugMail =
+        window.location.hostname === "localhost" ||
+        new URLSearchParams(window.location.search).has("debugMail");
+
+      const baseMsg =
+        data?.emailSent === false
+          ? (data?.message || "Message received, but email delivery failed.")
+          : (data?.message || "Thank you! Your message has been sent.");
+
+      const debugDetails =
+        debugMail && data?.emailSent === false
+          ? `\n\nEmail To: ${data?.emailTo || "unknown"}\nError: ${data?.emailError || "unknown"}`
+          : "";
+
+      setSuccessMessage(`${baseMsg}${debugDetails}`);
       setSubmitted(true);
       
       // Reset form after 3 seconds
@@ -120,7 +138,7 @@ const Contact = ({ onBack }) => {
             {submitted ? (
               <div className="contact-success">
                 <span className="success-icon">✓</span>
-                <p>Thank you! Your message has been sent.</p>
+                <p>{successMessage || "Thank you! Your message has been sent."}</p>
               </div>
             ) : (
               <>

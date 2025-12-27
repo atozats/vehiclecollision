@@ -13,6 +13,7 @@ const Feedback = ({ onBack }) => {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -31,12 +32,14 @@ const Feedback = ({ onBack }) => {
       // Determine API base URL.
       // IMPORTANT: CRA env vars are baked at build-time. In production we prefer same-origin
       // so the deployed frontend always talks to the same domain automatically.
+      // Local dev: default to local backend (no proxy configured in client/package.json).
+      // Production: same-origin.
       const rawApiBaseUrl =
         process.env.REACT_APP_API_URL ||
         (window.location.hostname === "localhost"
-          ? "https://ucasaapp.com/"
+          ? "http://localhost:5000"
           : window.location.origin);
-      const apiBaseUrl = rawApiBaseUrl.replace(/\/+$/, "");
+      const apiBaseUrl = (rawApiBaseUrl || "").replace(/\/+$/, "");
 
       const response = await fetch(`${apiBaseUrl}/api/feedback`, {
         method: 'POST',
@@ -53,6 +56,21 @@ const Feedback = ({ onBack }) => {
       }
 
       // Show success message
+      const debugMail =
+        window.location.hostname === "localhost" ||
+        new URLSearchParams(window.location.search).has("debugMail");
+
+      const baseMsg =
+        data?.emailSent === false
+          ? (data?.message || "Feedback received, but email delivery failed.")
+          : (data?.message || "Your feedback has been received. Thank you!");
+
+      const debugDetails =
+        debugMail && data?.emailSent === false
+          ? `\n\nEmail To: ${data?.emailTo || "unknown"}\nError: ${data?.emailError || "unknown"}`
+          : "";
+
+      setSuccessMessage(`${baseMsg}${debugDetails}`);
       setSubmitted(true);
       
       // Reset form after 3 seconds
@@ -93,7 +111,7 @@ const Feedback = ({ onBack }) => {
             <div className="feedback-success">
               <span className="success-icon">✓</span>
               <h2>Thank You!</h2>
-              <p>Your feedback has been received. We appreciate your input!</p>
+              <p>{successMessage || "Your feedback has been received. We appreciate your input!"}</p>
             </div>
             ) : (
             <>

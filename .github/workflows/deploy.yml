@@ -138,6 +138,8 @@ jobs:
           SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
           SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
           SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          FEEDBACK_EMAIL: ${{ secrets.FEEDBACK_EMAIL }}
+          CONTACT_EMAIL: ${{ secrets.CONTACT_EMAIL }}
           PM2_APP_NAME: ${{ github.ref == 'refs/heads/ucasaappmain_testCICD_final_deploy' && 'ucasaapp' || 'ucasaapp-test' }}
         run: |
           SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=~/.ssh/known_hosts -o ConnectTimeout=30 -o ServerAliveInterval=60 -o ServerAliveCountMax=3"
@@ -149,6 +151,7 @@ jobs:
           # Pass required values explicitly to the remote shell.
           REMOTE_ENV=$(printf 'VPS_APP_DIR=%q NODE_ENV=%q PORT=%q MONGODB_URI=%q SMTP_EMAIL=%q SMTP_EMAIL_PASSWORD=%q SMTP_NAME=%q SMTP_PORT=%q SMTP_SECURE=%q SMTP_SERVER=%q SMTP_FROM=%q PM2_APP_NAME=%q' \
             "$VPS_APP_DIR" "$NODE_ENV" "$PORT" "$MONGODB_URI" "$SMTP_EMAIL" "$SMTP_EMAIL_PASSWORD" "$SMTP_NAME" "$SMTP_PORT" "$SMTP_SECURE" "$SMTP_SERVER" "$SMTP_FROM" "$PM2_APP_NAME")
+          REMOTE_ENV="$REMOTE_ENV $(printf 'FEEDBACK_EMAIL=%q CONTACT_EMAIL=%q' "$FEEDBACK_EMAIL" "$CONTACT_EMAIL")"
 
           ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" "$REMOTE_ENV bash -s" << 'EOF'
           set -e
@@ -176,6 +179,8 @@ jobs:
             "SMTP_PORT=$SMTP_PORT" \
             "SMTP_SECURE=$SMTP_SECURE" \
             "SMTP_FROM=$SMTP_FROM" \
+            "FEEDBACK_EMAIL=$FEEDBACK_EMAIL" \
+            "CONTACT_EMAIL=$CONTACT_EMAIL" \
             > .env
           echo "✅ .env file created"
 

@@ -7,6 +7,13 @@ const { getDistance, getRhumbLineBearing } = require("geolib");
 const nodemailer = require("nodemailer");
 require("dotenv").config();
 const path = require("path");
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function getFromEmail() {
+  const raw = (process.env.SMTP_FROM || "").trim();
+  if (raw && emailRegex.test(raw)) return raw;
+  return (process.env.SMTP_EMAIL || "").trim();
+}
 
 const app = express();
 const server = http.createServer(app);
@@ -117,6 +124,14 @@ const previousDistances = new Map();
 app.use(express.static(path.join(__dirname, "build"), {
   maxAge: '1y',
   setHeaders: (res, filePath) => {
+    // Don't cache HTML entrypoints (otherwise users keep loading old JS bundles)
+    if (filePath.endsWith('index.html') || filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      return;
+    }
+
     // Don't cache service worker or manifest
     if (filePath.endsWith('service-worker.js') || filePath.endsWith('manifest.json')) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -139,6 +154,10 @@ app.get('/service-worker.js', (req, res) => {
 
 // Catch-all route for client-side routing (must be last)
 app.get("*", (req, res) => {
+  // Never cache SPA entrypoint
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.sendFile(path.join(__dirname, "build", "index.html"));
 });
 
@@ -724,21 +743,53 @@ const isSmtpConfigured =
   !!process.env.SMTP_EMAIL &&
   !!process.env.SMTP_EMAIL_PASSWORD;
 
-const transporter = isSmtpConfigured
-  ? nodemailer.createTransport({
-      name: process.env.SMTP_NAME,
-      host: process.env.SMTP_SERVER,
-      port: parseInt(process.env.SMTP_PORT, 10),
-      secure: process.env.SMTP_SECURE === "true",
-      auth: {
-        user: process.env.SMTP_EMAIL,
-        pass: process.env.SMTP_EMAIL_PASSWORD,
-      },
-      tls: {
-        rejectUnauthorized: false, // Bypass hostname mismatch
-      },
-    })
-  : null;
+function createSmtpTransporter() {
+  if (!isSmtpConfigured) return null;
+  return nodemailer.createTransport({
+    name: process.env.SMTP_NAME,
+    host: process.env.SMTP_SERVER,
+    port: parseInt(process.env.SMTP_PORT, 10),
+    secure: process.env.SMTP_SECURE === "true",
+    auth: {
+      user: process.env.SMTP_EMAIL,
+      pass: process.env.SMTP_EMAIL_PASSWORD,
+    },
+    // Hostinger can occasionally reset connections; timeouts + TLS hints reduce ECONNRESET.
+    connectionTimeout: 30_000,
+    greetingTimeout: 30_000,
+    socketTimeout: 60_000,
+    tls: {
+      rejectUnauthorized: false, // keep existing behavior
+      servername: process.env.SMTP_SERVER, // SNI
+      minVersion: "TLSv1.2",
+    },
+  });
+}
+
+async function sendMailWithRetry(mailOptions) {
+  if (!transporter) throw new Error("SMTP transporter not configured");
+  try {
+    return await transporter.sendMail(mailOptions);
+  } catch (err) {
+    const code = err?.code || "";
+    const msg = (err?.message || "").toLowerCase();
+    const transient =
+      code === "ECONNRESET" ||
+      code === "ETIMEDOUT" ||
+      code === "ECONNREFUSED" ||
+      msg.includes("econnreset") ||
+      msg.includes("timeout");
+
+    if (!transient) throw err;
+
+    // One retry with a fresh transporter instance (helps when the SMTP socket got reset)
+    const fresh = createSmtpTransporter();
+    if (!fresh) throw err;
+    return await fresh.sendMail(mailOptions);
+  }
+}
+
+const transporter = createSmtpTransporter();
 
 if (!transporter) {
   console.warn(
@@ -775,7 +826,6 @@ app.post("/api/feedback", async (req, res) => {
     }
 
     // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({ error: "Invalid email format" });
     }
@@ -794,13 +844,16 @@ app.post("/api/feedback", async (req, res) => {
       <hr>
       <p><em>Submitted at: ${new Date().toLocaleString()}</em></p>
     `;
+    const feedbackToEmail =
+      process.env.FEEDBACK_EMAIL || "feedback.ucasaapp@atozasindia.in";
+    const fromEmail = getFromEmail();
     // Send email
     const mailOptions = {
-      from: process.env.SMTP_FROM || process.env.SMTP_EMAIL,
-      to: "feedback.ucasaapp@atozasindia.in",
+      from: fromEmail,
+      to: feedbackToEmail,
       subject: emailSubject,
       html: emailBody,
-      replyTo: email,
+      replyTo: { name: name || "UCASA User", address: email },
     };
     
     // Always store feedback to DB first (so user doesn't lose it even if email fails)
@@ -828,25 +881,42 @@ app.post("/api/feedback", async (req, res) => {
     // Email is best-effort (do not fail the request if SMTP is down)
     if (transporter) {
       try {
-        await transporter.sendMail(mailOptions);
+        const info = await sendMailWithRetry(mailOptions);
+        if (process.env.NODE_ENV !== "production") {
+          console.log("📧 Feedback email sent:", {
+            to: feedbackToEmail,
+            accepted: info?.accepted,
+            rejected: info?.rejected,
+            messageId: info?.messageId,
+            response: info?.response,
+          });
+        }
       } catch (mailError) {
         console.error("Feedback saved but email failed:", mailError);
         return res.status(200).json({
           success: true,
-          message: "Feedback saved successfully (email notification failed).",
+          emailSent: false,
+          message:
+            "Feedback received and saved. Email notification failed (check SMTP settings).",
+          emailTo: feedbackToEmail,
+          emailError: mailError?.message || String(mailError),
         });
       }
     } else {
       console.warn("Feedback saved; SMTP not configured, skipping email.");
       return res.status(200).json({
         success: true,
-        message: "Feedback saved successfully (email not configured).",
+        emailSent: false,
+        message: "Feedback received and saved. Email not sent (SMTP not configured).",
+        emailTo: feedbackToEmail,
       });
     }
 
     return res.status(200).json({
       success: true,
-      message: "Feedback submitted successfully",
+      emailSent: true,
+      message: "Feedback received successfully",
+      emailTo: feedbackToEmail,
     });
   } catch (error) {
     console.error("Error in /api/feedback endpoint:", error);
@@ -872,7 +942,6 @@ app.post("/api/contact", async (req, res) => {
     }
 
     // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({ error: "Invalid email format" });
     }
@@ -892,13 +961,19 @@ app.post("/api/contact", async (req, res) => {
       <p><em>Submitted at: ${new Date().toLocaleString()}</em></p>
     `;
 
+    const contactToEmail =
+      process.env.CONTACT_EMAIL ||
+      process.env.FEEDBACK_EMAIL ||
+      "feedback.ucasaapp@atozasindia.in";
+    const fromEmail = getFromEmail();
+
     // Send email
     const mailOptions = {
-      from: process.env.SMTP_FROM || process.env.SMTP_EMAIL,
-      to: "feedback.ucasaapp@atozasindia.in",
+      from: fromEmail,
+      to: contactToEmail,
       subject: emailSubject,
       html: emailBody,
-      replyTo: email,
+      replyTo: { name: name || "UCASA User", address: email },
     };
 
     // Always store message to DB first
@@ -918,25 +993,42 @@ app.post("/api/contact", async (req, res) => {
     // Email is best-effort
     if (transporter) {
       try {
-        await transporter.sendMail(mailOptions);
+        const info = await sendMailWithRetry(mailOptions);
+        if (process.env.NODE_ENV !== "production") {
+          console.log("📧 Contact email sent:", {
+            to: contactToEmail,
+            accepted: info?.accepted,
+            rejected: info?.rejected,
+            messageId: info?.messageId,
+            response: info?.response,
+          });
+        }
       } catch (mailError) {
         console.error("Contact saved but email failed:", mailError);
         return res.status(200).json({
           success: true,
-          message: "Message saved successfully (email notification failed).",
+          emailSent: false,
+          message:
+            "Message received and saved. Email notification failed (check SMTP settings).",
+          emailTo: contactToEmail,
+          emailError: mailError?.message || String(mailError),
         });
       }
     } else {
       console.warn("Contact saved; SMTP not configured, skipping email.");
       return res.status(200).json({
         success: true,
-        message: "Message saved successfully (email not configured).",
+        emailSent: false,
+        message: "Message received and saved. Email not sent (SMTP not configured).",
+        emailTo: contactToEmail,
       });
     }
 
     return res.status(200).json({
       success: true,
-      message: "Message sent successfully",
+      emailSent: true,
+      message: "Message received successfully",
+      emailTo: contactToEmail,
     });
   } catch (error) {
     console.error("Error sending contact email:", error);

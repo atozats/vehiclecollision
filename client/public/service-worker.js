@@ -1,7 +1,7 @@
-const CACHE_NAME = 'ucasaapp-v1.0.1';
+const CACHE_NAME = 'ucasaapp-v1.0.2';
 const urlsToCache = [
-  '/',
-  '/index.html',
+  // Note: do NOT precache '/' or '/index.html'.
+  // If we cache the HTML shell, users often get stuck on an old build after deploy.
   '/manifest.json',
   '/favicon.ico',
   '/favicon-96x96.png',
@@ -59,6 +59,24 @@ self.addEventListener('fetch', (event) => {
 
   // Skip cross-origin requests
   if (url.origin !== location.origin) {
+    return;
+  }
+
+  // Navigation requests (HTML) - Network First, fallback to cached index.html
+  // This ensures users get the latest deployed JS bundle references after deploy.
+  if (request.mode === 'navigate' || (request.headers.get('accept') || '').includes('text/html')) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          // Cache the latest index.html for offline fallback
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put('/index.html', responseClone);
+          });
+          return response;
+        })
+        .catch(() => caches.match('/index.html'))
+    );
     return;
   }
 

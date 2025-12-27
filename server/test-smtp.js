@@ -26,14 +26,20 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const fromEmail = emailRegex.test((process.env.SMTP_FROM || '').trim())
+  ? process.env.SMTP_FROM.trim()
+  : (process.env.SMTP_EMAIL || '').trim();
+
 console.log('\n🔍 Testing SMTP Connection...\n');
 console.log(`Server: ${process.env.SMTP_SERVER}:${process.env.SMTP_PORT}`);
 console.log(`Email: ${process.env.SMTP_EMAIL}`);
 console.log(`Secure: ${process.env.SMTP_SECURE === 'true' ? 'Yes (TLS/SSL)' : 'No (STARTTLS)'}`);
 console.log(`Name: ${process.env.SMTP_NAME || 'Not set'}`);
+console.log(`From: ${fromEmail}`);
 console.log('\n⏳ Verifying connection...\n');
 
-transporter.verify((error, success) => {
+transporter.verify(async (error, success) => {
   if (error) {
     console.error('❌ SMTP Authentication Failed!\n');
     console.error(`Error: ${error.message}\n`);
@@ -87,7 +93,33 @@ transporter.verify((error, success) => {
     console.log('✅ SMTP Server is ready to send emails!\n');
     console.log('🎉 Your SMTP configuration is correct!');
     console.log('   You can now use feedback/contact forms.\n');
-    process.exit(0);
+
+    // Optional: send a test email to confirm delivery (not just auth)
+    const testTo =
+      process.env.TEST_TO ||
+      process.env.FEEDBACK_EMAIL ||
+      process.env.CONTACT_EMAIL ||
+      process.env.SMTP_EMAIL;
+
+    try {
+      console.log(`📨 Sending test email to: ${testTo}`);
+      const info = await transporter.sendMail({
+        from: fromEmail,
+        to: testTo,
+        subject: 'UCASA SMTP Test',
+        text: `SMTP test mail sent at ${new Date().toISOString()}`,
+      });
+      console.log('✅ Test email sent');
+      console.log('   accepted:', info?.accepted);
+      console.log('   rejected:', info?.rejected);
+      console.log('   messageId:', info?.messageId);
+      console.log('   response:', info?.response);
+      process.exit(0);
+    } catch (sendErr) {
+      console.error('❌ Test email send failed');
+      console.error(`Error: ${sendErr?.message || sendErr}`);
+      process.exit(1);
+    }
   }
 });
 
