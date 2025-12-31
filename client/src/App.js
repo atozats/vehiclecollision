@@ -20,7 +20,11 @@ const getSocketUrl = () => {
   if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
     return "http://localhost:5000";
   }
-  return window.location.origin.replace(/\/+$/, "");
+  // Use current origin (www.ucasaapp.com or ucasaapp.com)
+  // Server CORS is configured to accept both
+  const origin = window.location.origin.replace(/\/+$/, "");
+  console.log('🔌 Socket.IO connecting to:', origin);
+  return origin;
 };
 
 const socketUrl = getSocketUrl();

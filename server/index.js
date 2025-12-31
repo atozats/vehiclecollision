@@ -17,16 +17,49 @@ function getFromEmail() {
 
 const app = express();
 const server = http.createServer(app);
+// CORS configuration - allow both www and non-www versions
+const allowedOrigins = process.env.NODE_ENV === 'production'
+  ? [
+      "https://www.ucasaapp.com",
+      "https://ucasaapp.com",
+      "https://ucasaapp.testatozas.in"
+    ]
+  : [
+      "http://localhost:3000",
+      "http://localhost:5000"
+    ];
+
 const io = socketIo(server, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     methods: ["GET", "POST"],
+    credentials: true,
   },
 });
 
-
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+}));
 app.use(express.json());
 
 // PWA and Security Headers
