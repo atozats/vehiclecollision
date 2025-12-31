@@ -12,13 +12,23 @@ import "./App.css";
 
 // Socket.IO server URL
 // Prefer env override, otherwise use same-origin in production.
-const rawSocketUrl =
-  process.env.REACT_APP_SOCKET_URL ||
-  (window.location.hostname === "localhost"
-    ? "https://ucasaapp.com/"
-    : window.location.origin);
-const socketUrl = rawSocketUrl.replace(/\/+$/, "");
-const socket = io(socketUrl);
+const getSocketUrl = () => {
+  if (process.env.REACT_APP_SOCKET_URL) {
+    return process.env.REACT_APP_SOCKET_URL.replace(/\/+$/, "");
+  }
+  if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+    return "http://localhost:5000";
+  }
+  return window.location.origin.replace(/\/+$/, "");
+};
+
+const socketUrl = getSocketUrl();
+const socket = io(socketUrl, {
+  reconnection: true,
+  reconnectionDelay: 1000,
+  reconnectionAttempts: 5,
+  timeout: 20000,
+});
 
 function App() {
   const [vehicles, setVehicles] = useState([]);
@@ -42,6 +52,37 @@ function App() {
 
   // Separate useEffect for socket setup
   useEffect(() => {
+    // Monitor socket connection status
+    const onConnect = () => {
+      console.log("✅ Socket.IO connected:", socket.id);
+    };
+    
+    const onDisconnect = (reason) => {
+      console.warn("⚠️ Socket.IO disconnected:", reason);
+    };
+    
+    const onConnectError = (error) => {
+      console.error("❌ Socket.IO connection error:", error);
+    };
+    
+    socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
+    socket.on("connect_error", onConnectError);
+    
+    // Wait for connection before emitting requests
+    const requestData = () => {
+      if (socket.connected) {
+        socket.emit("get-vehicles");
+        socket.emit("get-all-users");
+      } else {
+        // Wait for connection
+        socket.once("connect", () => {
+          socket.emit("get-vehicles");
+          socket.emit("get-all-users");
+        });
+      }
+    };
+    
     // Listen for vehicle updates
     socket.on("vehicles-update", (vehicleList) => {
       setVehicles(vehicleList);
@@ -59,15 +100,14 @@ function App() {
     });
 
     // Listen for collision alerts
-      socket.on("collision-alert", (alert) => {
-        setCollisionAlert(alert);
-        // Auto-dismiss alert after 3 minutes (180 seconds)
-        setTimeout(() => setCollisionAlert(null), 180000);
-      });
+    socket.on("collision-alert", (alert) => {
+      setCollisionAlert(alert);
+      // Auto-dismiss alert after 3 minutes (180 seconds)
+      setTimeout(() => setCollisionAlert(null), 180000);
+    });
 
     // Request initial vehicle list and all users
-    socket.emit("get-vehicles");
-    socket.emit("get-all-users");
+    requestData();
 
     // Update time every second
     const timeInterval = setInterval(() => {
@@ -83,6 +123,9 @@ function App() {
     }, 10000);
 
     return () => {
+      socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
+      socket.off("connect_error", onConnectError);
       socket.off("vehicles-update");
       socket.off("all-users-update");
       socket.off("collision-alert");
@@ -436,30 +479,63 @@ function App() {
 
   const handleAddVehicle = (phoneNumber, vehicleId, fullName, vehicleType) => {
     return new Promise((resolve, reject) => {
-      socket.emit("register-vehicle", { phoneNumber, vehicleId, fullName, vehicleType });
+      // Check if socket is connected
+      if (!socket.connected) {
+        console.warn("Socket not connected, waiting for connection...");
+        
+        // Wait for connection with timeout
+        const connectionTimeout = setTimeout(() => {
+          socket.off("connect", onConnect);
+          reject(new Error("Socket connection timeout. Please check if the server is running."));
+        }, 10000);
+        
+        const onConnect = () => {
+          clearTimeout(connectionTimeout);
+          socket.off("connect", onConnect);
+          // Retry registration after connection
+          registerVehicle();
+        };
+        
+        socket.on("connect", onConnect);
+        return;
+      }
       
-      // Listen for registration success
-      const handleSuccess = (data) => {
-        socket.off("registration-success", handleSuccess);
-        socket.off("registration-error", handleError);
-        resolve(data);
+      // Register vehicle function
+      const registerVehicle = () => {
+        console.log("Registering vehicle:", { phoneNumber, vehicleId, fullName, vehicleType });
+        socket.emit("register-vehicle", { phoneNumber, vehicleId, fullName, vehicleType });
+        
+        // Listen for registration success
+        const handleSuccess = (data) => {
+          clearTimeout(timeoutId);
+          socket.off("registration-success", handleSuccess);
+          socket.off("registration-error", handleError);
+          console.log("Vehicle registered successfully:", data);
+          resolve(data);
+        };
+        
+        const handleError = (error) => {
+          clearTimeout(timeoutId);
+          socket.off("registration-success", handleSuccess);
+          socket.off("registration-error", handleError);
+          console.error("Registration error:", error);
+          reject(new Error(error.error || "Failed to register vehicle."));
+        };
+        
+        socket.on("registration-success", handleSuccess);
+        socket.on("registration-error", handleError);
+        
+        // Timeout after 15 seconds (increased from 10)
+        const timeoutId = setTimeout(() => {
+          socket.off("registration-success", handleSuccess);
+          socket.off("registration-error", handleError);
+          console.error("Registration timeout - socket connected:", socket.connected);
+          reject(new Error("Registration timeout. Server may be slow or unresponsive."));
+        }, 15000);
       };
       
-      const handleError = (error) => {
-        socket.off("registration-success", handleSuccess);
-        socket.off("registration-error", handleError);
-        reject(new Error(error.error || "Registration failed"));
-      };
-      
-      socket.on("registration-success", handleSuccess);
-      socket.on("registration-error", handleError);
-      
-      // Timeout after 10 seconds
-      setTimeout(() => {
-        socket.off("registration-success", handleSuccess);
-        socket.off("registration-error", handleError);
-        reject(new Error("Registration timeout"));
-      }, 10000);
+      // Start registration
+      registerVehicle();
     });
   };
 
