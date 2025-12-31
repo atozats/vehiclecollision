@@ -627,9 +627,6 @@ function App() {
 
   const handleBackToLanding = () => {
     setShowLandingPage(true);
-    // Clear currentUser so landing page actually shows
-    // But keep localStorage so form doesn't show after refresh
-    setCurrentUser(null);
   };
 
   const handleShowAboutLegalWithView = (view) => {
@@ -787,7 +784,6 @@ function App() {
           onStartSimulated={() => startSimulatedLocationDirect(currentUser)}
           onUpdateUser={handleUpdateUser}
           onStopGPS={stopGPSTracking}
-          onBackToLanding={handleBackToLanding}
         />
 
         {collisionAlert && (

@@ -24,7 +24,6 @@ const LocationTrackingControl = ({
   onAddVehicle,
   onUpdateUser,
   onStopGPS,
-  onBackToLanding,
 }) => {
   const [isLocationEnabled, setIsLocationEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -34,13 +33,7 @@ const LocationTrackingControl = ({
     vehicleId: '',
     vehicleType: 'car'
   });
-  
-  // Check localStorage on mount to persist state across refreshes
-  const [isDetailsSaved, setIsDetailsSaved] = useState(() => {
-    const saved = localStorage.getItem('userDetailsSaved');
-    const savedPhone = localStorage.getItem('userPhone');
-    return saved === 'true' && savedPhone !== null;
-  });
+  const [isDetailsSaved, setIsDetailsSaved] = useState(false);
 
   // Find current user's vehicle data
   const currentVehicle = vehicles.find(
@@ -55,19 +48,12 @@ const LocationTrackingControl = ({
 
   useEffect(() => {
     // Check if details are already saved
-    // Priority: localStorage > currentUser state
-    const saved = localStorage.getItem('userDetailsSaved');
-    const savedPhone = localStorage.getItem('userPhone');
-    
+    // Only update if currentUser has all required fields
     if (currentUser && currentUser.name && currentUser.phoneNumber && currentUser.vehicleId) {
       setIsDetailsSaved(true);
-      // Persist to localStorage
-      localStorage.setItem('userDetailsSaved', 'true');
-    } else if (saved === 'true' && savedPhone) {
-      // If localStorage says details were saved, don't show form even if currentUser is null
-      setIsDetailsSaved(true);
-    } else if (!currentUser && saved !== 'true') {
-      // Only set to false if currentUser is null AND localStorage doesn't say saved
+    } else if (!currentUser) {
+      // Only set to false if currentUser is null/undefined
+      // Don't override if isDetailsSaved is already true (user just added details)
       setIsDetailsSaved(false);
     }
   }, [currentUser]);
@@ -92,9 +78,6 @@ const LocationTrackingControl = ({
       
       // Set isDetailsSaved to true immediately to hide the form
       setIsDetailsSaved(true);
-      
-      // Persist to localStorage so form doesn't show after refresh
-      localStorage.setItem('userDetailsSaved', 'true');
       
       // Update current user state with data from server
       if (result.user) {
@@ -277,40 +260,17 @@ const LocationTrackingControl = ({
           <div className="vehicle-info">
             <h4>✅ Your Details</h4>
             <p>
-              <strong>Name:</strong> {currentUser?.name || 'N/A'}
+              <strong>Name:</strong> {currentUser.name}
             </p>
             <p>
-              <strong>Vehicle ID:</strong> {currentUser?.vehicleId || 'N/A'}
+              <strong>Vehicle ID:</strong> {currentUser.vehicleId}
             </p>
             <p>
-              <strong>Vehicle Type:</strong> {currentUser?.vehicleType ? `${getVehicleEmoji(currentUser.vehicleType)} ${currentUser.vehicleType.charAt(0).toUpperCase() + currentUser.vehicleType.slice(1)}` : 'N/A'}
+              <strong>Vehicle Type:</strong> {getVehicleEmoji(currentUser.vehicleType)} {currentUser.vehicleType?.charAt(0).toUpperCase() + currentUser.vehicleType?.slice(1)}
             </p>
             <p>
-              <strong>Phone:</strong> {currentUser?.phoneNumber || 'N/A'}
+              <strong>Phone:</strong> {currentUser.phoneNumber}
             </p>
-            {onBackToLanding && (
-              <button
-                onClick={onBackToLanding}
-                className="back-to-landing-btn"
-                style={{
-                  marginTop: '15px',
-                  padding: '10px 20px',
-                  backgroundColor: '#6c5ce7',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  width: '100%',
-                  transition: 'background-color 0.3s ease'
-                }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#a29bfe'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = '#6c5ce7'}
-              >
-                ← Back to Landing Page
-              </button>
-            )}
           </div>
         )}
 
