@@ -81,12 +81,20 @@ self.addEventListener('fetch', (event) => {
   }
 
   // API calls - Network First, fallback to Cache
+  // Skip POST, PUT, DELETE, PATCH requests (only cache GET requests)
   if (url.pathname.startsWith('/api/')) {
+    // Don't cache POST/PUT/DELETE/PATCH requests
+    if (request.method !== 'GET') {
+      // Just fetch without caching
+      event.respondWith(fetch(request));
+      return;
+    }
+    
     event.respondWith(
       fetch(request)
         .then((response) => {
-          // Clone and cache successful responses
-          if (response.ok) {
+          // Clone and cache successful GET responses only
+          if (response.ok && request.method === 'GET') {
             const responseClone = response.clone();
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(request, responseClone);
@@ -95,7 +103,7 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => {
-          // Fallback to cache if network fails
+          // Fallback to cache if network fails (GET requests only)
           return caches.match(request);
         })
     );
@@ -119,12 +127,15 @@ self.addEventListener('fetch', (event) => {
               return response;
             }
 
-            // Clone and cache the response
-            const responseToCache = response.clone();
-            caches.open(CACHE_NAME)
-              .then((cache) => {
-                cache.put(request, responseToCache);
-              });
+            // Only cache GET requests (POST/PUT/DELETE/PATCH should not be cached)
+            if (request.method === 'GET') {
+              // Clone and cache the response
+              const responseToCache = response.clone();
+              caches.open(CACHE_NAME)
+                .then((cache) => {
+                  cache.put(request, responseToCache);
+                });
+            }
 
             return response;
           })

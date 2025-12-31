@@ -151,6 +151,18 @@ function App() {
             ? window.location.origin 
             : 'http://localhost:5000';
           const response = await fetch(`${apiUrl}/api/user/${storedPhone}`);
+          
+          // Check if response is JSON before parsing
+          const contentType = response.headers.get("content-type");
+          if (!contentType || !contentType.includes("application/json")) {
+            console.warn("API response is not JSON, got:", contentType);
+            // Clear local storage if API returns HTML/error page
+            localStorage.removeItem("userPhone");
+            localStorage.removeItem("userDetailsSaved");
+            setShowLandingPage(true);
+            return;
+          }
+          
           if (response.ok) {
             const result = await response.json();
             if (result.success) {
@@ -165,12 +177,14 @@ function App() {
           } else {
             // User not found in database, clear local storage
             localStorage.removeItem("userPhone");
+            localStorage.removeItem("userDetailsSaved");
             setShowLandingPage(true);
           }
         } catch (error) {
           console.error("Failed to fetch user data:", error);
           // Clear local storage on error
           localStorage.removeItem("userPhone");
+          localStorage.removeItem("userDetailsSaved");
           setShowLandingPage(true);
         }
       } else {
@@ -635,25 +649,51 @@ function App() {
     
     if (saved === 'true' && savedPhone) {
       // Try to restore user from API
-      try {
-        const apiUrl = process.env.NODE_ENV === 'production' 
-          ? window.location.origin 
-          : 'http://localhost:5000';
-        const response = await fetch(`${apiUrl}/api/user/${savedPhone}`);
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success && result.user) {
-            setCurrentUser(result.user);
+        try {
+          const apiUrl = process.env.NODE_ENV === 'production' 
+            ? window.location.origin 
+            : 'http://localhost:5000';
+          const response = await fetch(`${apiUrl}/api/user/${savedPhone}`);
+          
+          // Check if response is JSON before parsing
+          const contentType = response.headers.get("content-type");
+          if (!contentType || !contentType.includes("application/json")) {
+            console.warn("API response is not JSON, got:", contentType);
+            // Fall back to localStorage data
+            const userData = {
+              phoneNumber: savedPhone,
+              name: localStorage.getItem('userName') || 'User',
+              vehicleId: localStorage.getItem('userVehicleId') || '',
+              vehicleType: localStorage.getItem('userVehicleType') || 'car'
+            };
+            setCurrentUser(userData);
             setShowLandingPage(false);
-            // Auto-register the user as a vehicle
-            handleAddVehicle(result.user.phoneNumber, result.user.vehicleId, result.user.name, result.user.vehicleType || 'car')
-              .catch(error => console.error("Auto-registration failed:", error));
             return;
           }
+          
+          if (response.ok) {
+            const result = await response.json();
+            if (result.success && result.user) {
+              setCurrentUser(result.user);
+              setShowLandingPage(false);
+              // Auto-register the user as a vehicle
+              handleAddVehicle(result.user.phoneNumber, result.user.vehicleId, result.user.name, result.user.vehicleType || 'car')
+                .catch(error => console.error("Auto-registration failed:", error));
+              return;
+            }
+          }
+        } catch (error) {
+          console.error("Failed to fetch user data:", error);
+          // Fall back to localStorage data
+          const userData = {
+            phoneNumber: savedPhone,
+            name: localStorage.getItem('userName') || 'User',
+            vehicleId: localStorage.getItem('userVehicleId') || '',
+            vehicleType: localStorage.getItem('userVehicleType') || 'car'
+          };
+          setCurrentUser(userData);
+          setShowLandingPage(false);
         }
-      } catch (error) {
-        console.error("Failed to fetch user data:", error);
-      }
       
       // If API call fails, restore from localStorage (basic info)
       // This ensures form doesn't show even if API is down
