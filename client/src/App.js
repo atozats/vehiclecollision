@@ -143,7 +143,10 @@ function App() {
       const storedPhone = localStorage.getItem("userPhone");
       if (storedPhone) {
         try {
-          const response = await fetch(`https://ucasaapp.com//api/user/${storedPhone}`);
+          const apiUrl = process.env.NODE_ENV === 'production' 
+            ? window.location.origin 
+            : 'http://localhost:5000';
+          const response = await fetch(`${apiUrl}/api/user/${storedPhone}`);
           if (response.ok) {
             const result = await response.json();
             if (result.success) {
@@ -621,7 +624,44 @@ function App() {
     setCollisionAlert(null);
   };
 
-  const handleGetStarted = () => {
+  const handleGetStarted = async () => {
+    // Check if user details were already saved
+    const saved = localStorage.getItem('userDetailsSaved');
+    const savedPhone = localStorage.getItem('userPhone');
+    
+    if (saved === 'true' && savedPhone) {
+      // Try to restore user from API
+      try {
+        const apiUrl = process.env.NODE_ENV === 'production' 
+          ? window.location.origin 
+          : 'http://localhost:5000';
+        const response = await fetch(`${apiUrl}/api/user/${savedPhone}`);
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.user) {
+            setCurrentUser(result.user);
+            setShowLandingPage(false);
+            // Auto-register the user as a vehicle
+            handleAddVehicle(result.user.phoneNumber, result.user.vehicleId, result.user.name, result.user.vehicleType || 'car')
+              .catch(error => console.error("Auto-registration failed:", error));
+            return;
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch user data:", error);
+      }
+      
+      // If API call fails, restore from localStorage (basic info)
+      // This ensures form doesn't show even if API is down
+      const userData = {
+        phoneNumber: savedPhone,
+        name: localStorage.getItem('userName') || 'User',
+        vehicleId: localStorage.getItem('userVehicleId') || '',
+        vehicleType: localStorage.getItem('userVehicleType') || 'car'
+      };
+      setCurrentUser(userData);
+    }
+    
     setShowLandingPage(false);
   };
 
