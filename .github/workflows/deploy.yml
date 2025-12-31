@@ -102,8 +102,33 @@ jobs:
 
           # Test SSH connection
           echo "🔍 Testing SSH connection..."
+          echo "   Host: $VPS_HOST"
+          echo "   Port: ${VPS_PORT:-22}"
+          echo "   User: $VPS_USER"
+          
           ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" "echo 'SSH connection successful'" || {
-            echo "ERROR: Failed to establish SSH connection to $VPS_HOST"
+            echo ""
+            echo "❌ ERROR: Failed to establish SSH connection to $VPS_HOST"
+            echo ""
+            echo "📋 Troubleshooting steps:"
+            echo "   1. Verify VPS firewall allows port ${VPS_PORT:-22}"
+            echo "      Run on VPS: sudo ufw allow ${VPS_PORT:-22}/tcp"
+            echo ""
+            echo "   2. Check SSH service is running on VPS"
+            echo "      Run on VPS: sudo systemctl status ssh"
+            echo ""
+            echo "   3. Verify GitHub secrets are correct:"
+            echo "      - VPS_HOST: $VPS_HOST"
+            echo "      - VPS_PORT: ${VPS_PORT:-22}"
+            echo "      - VPS_USER: $VPS_USER"
+            echo "      - VPS_SSH_KEY: [should be set]"
+            echo ""
+            echo "   4. Test SSH manually from your local machine:"
+            echo "      ssh $([ -n "$VPS_PORT" ] && echo "-p $VPS_PORT") $VPS_USER@$VPS_HOST"
+            echo ""
+            echo "   5. Check if VPS provider has additional firewall"
+            echo "      Some providers require firewall rules in control panel"
+            echo ""
             exit 1
           }
 

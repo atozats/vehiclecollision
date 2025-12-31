@@ -10,6 +10,7 @@ import Feedback from "./components/Feedback";
 import InstallPWA from "./components/InstallPWA";
 import "./App.css";
 
+
 // Socket.IO server URL
 // Prefer env override, otherwise use same-origin in production.
 const getSocketUrl = () => {

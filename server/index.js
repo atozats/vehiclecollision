@@ -767,6 +767,7 @@ function createSmtpTransporter() {
 }
 
 
+
 async function sendMailWithRetry(mailOptions) {
   if (!transporter) throw new Error("SMTP transporter not configured");
   try {
