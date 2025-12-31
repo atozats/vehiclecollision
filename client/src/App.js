@@ -40,8 +40,25 @@ function App() {
   const [allUsers, setAllUsers] = useState([]);
   const [collisionAlert, setCollisionAlert] = useState(null);
   const [demoMode, setDemoMode] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [showLandingPage, setShowLandingPage] = useState(true);
+  // Restore user + skip landing page after refresh if details were already saved
+  const [currentUser, setCurrentUser] = useState(() => {
+    const saved = localStorage.getItem("userDetailsSaved") === "true";
+    const phone = localStorage.getItem("userPhone");
+    if (saved && phone) {
+      return {
+        phoneNumber: phone,
+        name: localStorage.getItem("userName") || "User",
+        vehicleId: localStorage.getItem("userVehicleId") || "",
+        vehicleType: localStorage.getItem("userVehicleType") || "car",
+      };
+    }
+    return null;
+  });
+  const [showLandingPage, setShowLandingPage] = useState(() => {
+    const saved = localStorage.getItem("userDetailsSaved") === "true";
+    const phone = localStorage.getItem("userPhone");
+    return !(saved && phone);
+  });
   const [gpsStatus, setGpsStatus] = useState("inactive"); // inactive, searching, active, error
   const [systemStatus, setSystemStatus] = useState({
     monitoring: "Active",
@@ -145,6 +162,22 @@ function App() {
     const checkExistingUser = async () => {
       // Try to get user from a stored phone number
       const storedPhone = localStorage.getItem("userPhone");
+      const savedFlag = localStorage.getItem("userDetailsSaved") === "true";
+
+      // If user already saved locally, keep them in-app (no landing, no form)
+      if (storedPhone && savedFlag) {
+        setShowLandingPage(false);
+        setCurrentUser((prev) => {
+          if (prev?.phoneNumber) return prev;
+          return {
+            phoneNumber: storedPhone,
+            name: localStorage.getItem("userName") || "User",
+            vehicleId: localStorage.getItem("userVehicleId") || "",
+            vehicleType: localStorage.getItem("userVehicleType") || "car",
+          };
+        });
+      }
+
       if (storedPhone) {
         try {
           const apiUrl = process.env.NODE_ENV === 'production' 
@@ -156,9 +189,16 @@ function App() {
           const contentType = response.headers.get("content-type");
           if (!contentType || !contentType.includes("application/json")) {
             console.warn("API response is not JSON, got:", contentType);
-            // Clear local storage if API returns HTML/error page
+            // If user was saved locally, keep showing ✅ Your Details.
+            // This commonly happens when the server returns an HTML page (redirect/404) or is down.
+            if (savedFlag) {
+              setShowLandingPage(false);
+              return;
+            }
+            // Otherwise, reset to landing
             localStorage.removeItem("userPhone");
             localStorage.removeItem("userDetailsSaved");
+            setCurrentUser(null);
             setShowLandingPage(true);
             return;
           }
@@ -168,23 +208,59 @@ function App() {
             if (result.success) {
               setCurrentUser(result.user);
               setShowLandingPage(false);
+              // Persist latest user fields so refresh always shows ✅ Your Details
+              localStorage.setItem("userDetailsSaved", "true");
+              localStorage.setItem("userPhone", result.user.phoneNumber);
+              localStorage.setItem("userName", result.user.name || "User");
+              localStorage.setItem("userVehicleId", result.user.vehicleId || "");
+              localStorage.setItem("userVehicleType", result.user.vehicleType || "car");
               // Auto-register the user as a vehicle (but don't wait for response)
               handleAddVehicle(result.user.phoneNumber, result.user.vehicleId, result.user.name, result.user.vehicleType || 'car')
                 .catch(error => console.error("Auto-registration failed:", error));
             } else {
-              setShowLandingPage(true);
+              // If we have a saved local user, keep UI stable; otherwise show landing
+              if (!savedFlag) setShowLandingPage(true);
             }
           } else {
-            // User not found in database, clear local storage
-            localStorage.removeItem("userPhone");
-            localStorage.removeItem("userDetailsSaved");
+            // Non-200 JSON response; if it's a real 404 (user deleted), let them re-add.
+            let errorBody = null;
+            try {
+              errorBody = await response.json();
+            } catch {
+              // ignore
+            }
+            const notFound =
+              response.status === 404 ||
+              (errorBody && (errorBody.error || "").toLowerCase().includes("not found"));
+
+            if (notFound) {
+              localStorage.removeItem("userPhone");
+              localStorage.removeItem("userDetailsSaved");
+              localStorage.removeItem("userName");
+              localStorage.removeItem("userVehicleId");
+              localStorage.removeItem("userVehicleType");
+              setCurrentUser(null);
+              setShowLandingPage(true);
+              return;
+            }
+
+            // Otherwise keep local user if present
+            if (savedFlag) {
+              setShowLandingPage(false);
+              return;
+            }
             setShowLandingPage(true);
           }
         } catch (error) {
           console.error("Failed to fetch user data:", error);
-          // Clear local storage on error
+          // Network/server error: keep showing ✅ Your Details if we have local saved user
+          if (savedFlag) {
+            setShowLandingPage(false);
+            return;
+          }
           localStorage.removeItem("userPhone");
           localStorage.removeItem("userDetailsSaved");
+          setCurrentUser(null);
           setShowLandingPage(true);
         }
       } else {
@@ -741,8 +817,9 @@ function App() {
     );
   }
 
-  // Show landing page if no user and landing page should be shown
-  if (showLandingPage && !currentUser) {
+  // Show landing page when requested (even if user exists).
+  // This allows a "Back" button that returns to Landing while keeping saved details.
+  if (showLandingPage) {
     return (
       <div className="App">
         <LandingPage 
@@ -796,15 +873,13 @@ function App() {
       <header className="App-header">
         <div className="header-content">
           <div className="header-main">
-            {!currentUser && (
-              <button 
-                className="back-btn"
-                onClick={handleBackToLanding}
-                title="Back to Landing Page"
-              >
-                ← Back
-              </button>
-            )}
+            <button 
+              className="back-btn"
+              onClick={handleBackToLanding}
+              title="Back to Landing Page"
+            >
+              ← Back
+            </button>
             {/* <span className="header-icon">UcasaApp</span> */}
             <div>
               <h1>Universal Collision Avoidance System Advisory App</h1>
@@ -868,6 +943,7 @@ function App() {
           onStartSimulated={() => startSimulatedLocationDirect(currentUser)}
           onUpdateUser={handleUpdateUser}
           onStopGPS={stopGPSTracking}
+          onBackToLanding={handleBackToLanding}
         />
 
         {collisionAlert && (

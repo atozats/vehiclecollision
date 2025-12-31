@@ -159,6 +159,22 @@
   gap: 10px;
 }
 
+.back-to-landing-btn {
+  padding: 12px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.95em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: #6c5ce7;
+  color: white;
+}
+
+.back-to-landing-btn:hover {
+  background: #a29bfe;
+}
+
 .toggle-btn {
   padding: 12px 20px;
   border: none;

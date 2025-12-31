@@ -24,6 +24,7 @@ const LocationTrackingControl = ({
   onAddVehicle,
   onUpdateUser,
   onStopGPS,
+  onBackToLanding,
 }) => {
   const [isLocationEnabled, setIsLocationEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -296,6 +297,15 @@ const LocationTrackingControl = ({
 
         {isDetailsSaved && (
           <div className="control-buttons">
+            {onBackToLanding && (
+              <button
+                type="button"
+                onClick={onBackToLanding}
+                className="back-to-landing-btn"
+              >
+                ← Back to Landing Page
+              </button>
+            )}
             <button
               onClick={handleToggleLocationTracking}
               disabled={isLoading}
