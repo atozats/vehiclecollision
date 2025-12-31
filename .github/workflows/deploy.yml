@@ -269,7 +269,14 @@ jobs:
           # Restart server with PM2
           echo "🔄 Restarting server..."
           if command -v pm2 >/dev/null 2>&1; then
-            pm2 restart "$PM2_APP_NAME" || pm2 start index.js --name "$PM2_APP_NAME"
+            # Check if process exists, then restart or start
+            if pm2 describe "$PM2_APP_NAME" >/dev/null 2>&1; then
+              echo "   Process exists, restarting..."
+              pm2 restart "$PM2_APP_NAME"
+            else
+              echo "   Process not found, starting new..."
+              pm2 start index.js --name "$PM2_APP_NAME"
+            fi
             pm2 save
             echo "✅ Server restarted with PM2 (name: $PM2_APP_NAME)"
           else
@@ -277,6 +284,8 @@ jobs:
             if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
               echo "🛠️ Installing pm2 globally..."
               sudo -n npm i -g pm2
+              # Delete existing process if it exists, then start
+              pm2 delete "$PM2_APP_NAME" 2>/dev/null || true
               pm2 start index.js --name "$PM2_APP_NAME"
               pm2 save
               echo "✅ Server started with PM2 (name: $PM2_APP_NAME)"
@@ -286,6 +295,8 @@ jobs:
               export PATH="$NPM_CONFIG_PREFIX/bin:$PATH"
               mkdir -p "$NPM_CONFIG_PREFIX"
               npm i -g pm2
+              # Delete existing process if it exists, then start
+              pm2 delete "$PM2_APP_NAME" 2>/dev/null || true
               pm2 start index.js --name "$PM2_APP_NAME"
               pm2 save
               echo "✅ Server started with PM2 (user install, name: $PM2_APP_NAME)"
