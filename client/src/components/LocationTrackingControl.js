@@ -297,7 +297,7 @@ const LocationTrackingControl = ({
 
         {isDetailsSaved && (
           <div className="control-buttons">
-            {onBackToLanding && (
+            {/* {onBackToLanding && (
               <button
                 type="button"
                 onClick={onBackToLanding}
@@ -305,7 +305,7 @@ const LocationTrackingControl = ({
               >
                 ← Back to Landing Page
               </button>
-            )}
+            )} */}
             <button
               onClick={handleToggleLocationTracking}
               disabled={isLoading}
