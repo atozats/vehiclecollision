@@ -129,6 +129,7 @@ function App() {
     checkExistingUser();
   }, []);
 
+  
   const startSimulatedLocationDirect = (userData) => {
     console.log(`Using simulated location for ${userData.name} (direct)`);
     setGpsStatus("active");
