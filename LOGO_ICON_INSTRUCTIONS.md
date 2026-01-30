@@ -207,7 +207,7 @@ GitHub Actions ಸ್ವಯಂಚಾಲಿತವಾಗಿ deploy ಮಾಡುತ
 ## 🧪 Verify on Live Site
 
 ### After deployment:
-1. Visit: https://ucasaapp.testatozas.in
+1. Visit: https://ucasaapp.com/
 2. Clear browser cache (Ctrl + Shift + Delete)
 3. Hard refresh (Ctrl + F5)
 4. Click install button

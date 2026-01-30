@@ -9,6 +9,7 @@ on:
       - "client/**"
       - "server/**"
       - ".github/workflows/deploy.yml"
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -101,8 +102,33 @@ jobs:
 
           # Test SSH connection
           echo "🔍 Testing SSH connection..."
+          echo "   Host: $VPS_HOST"
+          echo "   Port: ${VPS_PORT:-22}"
+          echo "   User: $VPS_USER"
+          
           ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" "echo 'SSH connection successful'" || {
-            echo "ERROR: Failed to establish SSH connection to $VPS_HOST"
+            echo ""
+            echo "❌ ERROR: Failed to establish SSH connection to $VPS_HOST"
+            echo ""
+            echo "📋 Troubleshooting steps:"
+            echo "   1. Verify VPS firewall allows port ${VPS_PORT:-22}"
+            echo "      Run on VPS: sudo ufw allow ${VPS_PORT:-22}/tcp"
+            echo ""
+            echo "   2. Check SSH service is running on VPS"
+            echo "      Run on VPS: sudo systemctl status ssh"
+            echo ""
+            echo "   3. Verify GitHub secrets are correct:"
+            echo "      - VPS_HOST: $VPS_HOST"
+            echo "      - VPS_PORT: ${VPS_PORT:-22}"
+            echo "      - VPS_USER: $VPS_USER"
+            echo "      - VPS_SSH_KEY: [should be set]"
+            echo ""
+            echo "   4. Test SSH manually from your local machine:"
+            echo "      ssh $([ -n "$VPS_PORT" ] && echo "-p $VPS_PORT") $VPS_USER@$VPS_HOST"
+            echo ""
+            echo "   5. Check if VPS provider has additional firewall"
+            echo "      Some providers require firewall rules in control panel"
+            echo ""
             exit 1
           }
 
@@ -116,6 +142,7 @@ jobs:
           echo "📤 Deploying backend code to VPS..."
           rsync -az --delete -e "ssh $SSH_OPTS" \
             --exclude "node_modules" \
+            --exclude "build" \
             server/ "$VPS_USER@$VPS_HOST:$VPS_APP_DIR/"
           echo "✅ Backend code deployed successfully"
 
@@ -136,6 +163,8 @@ jobs:
           SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
           SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
           SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          FEEDBACK_EMAIL: ${{ secrets.FEEDBACK_EMAIL }}
+          CONTACT_EMAIL: ${{ secrets.CONTACT_EMAIL }}
           PM2_APP_NAME: ${{ github.ref == 'refs/heads/ucasaappmain_testCICD_final_deploy' && 'ucasaapp' || 'ucasaapp-test' }}
         run: |
           SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=~/.ssh/known_hosts -o ConnectTimeout=30 -o ServerAliveInterval=60 -o ServerAliveCountMax=3"
@@ -143,7 +172,13 @@ jobs:
             SSH_OPTS="$SSH_OPTS -p $VPS_PORT"
           fi
 
-          ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" bash << EOF
+          # NOTE: use a *quoted* heredoc so $HOME and other vars resolve on the VPS (not on the GitHub runner).
+          # Pass required values explicitly to the remote shell.
+          REMOTE_ENV=$(printf 'VPS_APP_DIR=%q NODE_ENV=%q PORT=%q MONGODB_URI=%q SMTP_EMAIL=%q SMTP_EMAIL_PASSWORD=%q SMTP_NAME=%q SMTP_PORT=%q SMTP_SECURE=%q SMTP_SERVER=%q SMTP_FROM=%q PM2_APP_NAME=%q' \
+            "$VPS_APP_DIR" "$NODE_ENV" "$PORT" "$MONGODB_URI" "$SMTP_EMAIL" "$SMTP_EMAIL_PASSWORD" "$SMTP_NAME" "$SMTP_PORT" "$SMTP_SECURE" "$SMTP_SERVER" "$SMTP_FROM" "$PM2_APP_NAME")
+          REMOTE_ENV="$REMOTE_ENV $(printf 'FEEDBACK_EMAIL=%q CONTACT_EMAIL=%q' "$FEEDBACK_EMAIL" "$CONTACT_EMAIL")"
+
+          ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" "$REMOTE_ENV bash -s" << 'EOF'
           set -e
           echo "📂 Using VPS_APP_DIR: $VPS_APP_DIR"
           cd "$VPS_APP_DIR"
@@ -169,34 +204,107 @@ jobs:
             "SMTP_PORT=$SMTP_PORT" \
             "SMTP_SECURE=$SMTP_SECURE" \
             "SMTP_FROM=$SMTP_FROM" \
+            "FEEDBACK_EMAIL=$FEEDBACK_EMAIL" \
+            "CONTACT_EMAIL=$CONTACT_EMAIL" \
             > .env
           echo "✅ .env file created"
 
-          # Install backend dependencies
-          echo "📦 Installing backend dependencies..."
-          if command -v npm >/dev/null 2>&1; then
-            echo "Node.js version: $(node --version)"
-            echo "npm version: $(npm --version)"
-            npm ci --omit=dev
-            echo "✅ Dependencies installed"
-          else
-            echo "❌ ERROR: npm is not installed on the VPS."
-            echo "Please install Node.js:"
-            echo "  curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -"
-            echo "  sudo apt install -y nodejs"
+          # Ensure Node.js/npm exist (auto-install on Debian/Ubuntu if possible)
+          ensure_node() {
+            if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+              return 0
+            fi
+
+            echo "🛠️ Node.js/npm not found on VPS. Attempting to install..."
+
+            # Prefer system install when we can use non-interactive sudo (typical CI deploy user)
+            if command -v apt-get >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+              sudo -n apt-get update
+              sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl gnupg
+              curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -n -E bash -
+              sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs
+              return 0
+            fi
+
+            # Fallback: install Node.js without sudo via nvm (installs under $HOME)
+            echo "ℹ️ Falling back to nvm (no-sudo) install..."
+            if ! command -v curl >/dev/null 2>&1; then
+              echo "❌ Cannot install via nvm: curl not found on VPS."
+              return 1
+            fi
+
+            export NVM_DIR="$HOME/.nvm"
+            if [ ! -s "$NVM_DIR/nvm.sh" ]; then
+              echo "⬇️ Installing nvm..."
+              curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+            fi
+
+            # shellcheck disable=SC1090
+            . "$NVM_DIR/nvm.sh"
+            nvm install 18
+            nvm use 18
+            hash -r
+
+            command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1
+          }
+
+          if ! ensure_node; then
+            echo ""
+            echo "❌ ERROR: npm is not installed on the VPS and auto-install failed."
+            echo "Fix options:"
+            echo "  - Enable passwordless sudo for this user (recommended for CI deploy user), or"
+            echo "  - Pre-install Node.js on the VPS manually:"
+            echo "      curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -"
+            echo "      sudo apt-get install -y nodejs"
             exit 1
           fi
+
+          # Install backend dependencies
+          echo "📦 Installing backend dependencies..."
+          echo "Node.js version: $(node --version)"
+          echo "npm version: $(npm --version)"
+          npm ci --omit=dev
+          echo "✅ Dependencies installed"
 
           # Restart server with PM2
           echo "🔄 Restarting server..."
           if command -v pm2 >/dev/null 2>&1; then
-            pm2 restart "$PM2_APP_NAME" || pm2 start index.js --name "$PM2_APP_NAME"
+            # Check if process exists, then restart or start
+            if pm2 describe "$PM2_APP_NAME" >/dev/null 2>&1; then
+              echo "   Process exists, restarting..."
+              pm2 restart "$PM2_APP_NAME"
+            else
+              echo "   Process not found, starting new..."
+              pm2 start index.js --name "$PM2_APP_NAME"
+            fi
             pm2 save
             echo "✅ Server restarted with PM2 (name: $PM2_APP_NAME)"
           else
-            echo "⚠️ pm2 is not installed. Starting Node directly (no process manager)."
-            nohup node index.js >/dev/null 2>&1 &
-            echo "✅ Server started (without PM2)"
+            echo "⚠️ pm2 is not installed."
+            if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+              echo "🛠️ Installing pm2 globally..."
+              sudo -n npm i -g pm2
+              # Delete existing process if it exists, then start
+              pm2 delete "$PM2_APP_NAME" 2>/dev/null || true
+              pm2 start index.js --name "$PM2_APP_NAME"
+              pm2 save
+              echo "✅ Server started with PM2 (name: $PM2_APP_NAME)"
+            elif command -v npm >/dev/null 2>&1; then
+              echo "🛠️ Installing pm2 under user prefix (no sudo)..."
+              export NPM_CONFIG_PREFIX="$HOME/.npm-global"
+              export PATH="$NPM_CONFIG_PREFIX/bin:$PATH"
+              mkdir -p "$NPM_CONFIG_PREFIX"
+              npm i -g pm2
+              # Delete existing process if it exists, then start
+              pm2 delete "$PM2_APP_NAME" 2>/dev/null || true
+              pm2 start index.js --name "$PM2_APP_NAME"
+              pm2 save
+              echo "✅ Server started with PM2 (user install, name: $PM2_APP_NAME)"
+            else
+              echo "➡️ Starting Node directly (no process manager)."
+              nohup node index.js >/dev/null 2>&1 &
+              echo "✅ Server started (without PM2)"
+            fi
           fi
           EOF
 

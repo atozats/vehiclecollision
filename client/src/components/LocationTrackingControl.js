@@ -24,6 +24,7 @@ const LocationTrackingControl = ({
   onAddVehicle,
   onUpdateUser,
   onStopGPS,
+  onBackToLanding,
 }) => {
   const [isLocationEnabled, setIsLocationEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -33,7 +34,12 @@ const LocationTrackingControl = ({
     vehicleId: '',
     vehicleType: 'car'
   });
-  const [isDetailsSaved, setIsDetailsSaved] = useState(false);
+  // Initialize from localStorage to persist across page refreshes
+  const [isDetailsSaved, setIsDetailsSaved] = useState(() => {
+    const saved = localStorage.getItem('userDetailsSaved');
+    const savedPhone = localStorage.getItem('userPhone');
+    return saved === 'true' && savedPhone !== null;
+  });
 
   // Find current user's vehicle data
   const currentVehicle = vehicles.find(
@@ -48,9 +54,19 @@ const LocationTrackingControl = ({
 
   useEffect(() => {
     // Check if details are already saved
+    // Priority: localStorage > currentUser state
+    const saved = localStorage.getItem('userDetailsSaved');
+    const savedPhone = localStorage.getItem('userPhone');
+    
     if (currentUser && currentUser.name && currentUser.phoneNumber && currentUser.vehicleId) {
       setIsDetailsSaved(true);
-    } else {
+      // Persist to localStorage
+      localStorage.setItem('userDetailsSaved', 'true');
+    } else if (saved === 'true' && savedPhone) {
+      // If localStorage says details were saved, don't show form even if currentUser is null
+      setIsDetailsSaved(true);
+    } else if (!currentUser && saved !== 'true') {
+      // Only set to false if currentUser is null AND localStorage doesn't say saved
       setIsDetailsSaved(false);
     }
   }, [currentUser]);
@@ -73,6 +89,12 @@ const LocationTrackingControl = ({
       // Add vehicle to database
       const result = await onAddVehicle(userDetails.phoneNumber, userDetails.vehicleId, userDetails.name, userDetails.vehicleType);
       
+      // Set isDetailsSaved to true immediately to hide the form
+      setIsDetailsSaved(true);
+      
+      // Persist to localStorage so form doesn't show after refresh
+      localStorage.setItem('userDetailsSaved', 'true');
+      
       // Update current user state with data from server
       if (result.user) {
         onUpdateUser(result.user);
@@ -85,14 +107,28 @@ const LocationTrackingControl = ({
         });
       }
       
-      // Store phone number in localStorage for future reference
+      // Store user details in localStorage for future reference
       localStorage.setItem("userPhone", userDetails.phoneNumber);
+      localStorage.setItem("userName", userDetails.name);
+      localStorage.setItem("userVehicleId", userDetails.vehicleId);
+      localStorage.setItem("userVehicleType", userDetails.vehicleType);
       
-      setIsDetailsSaved(true);
+      // Clear form inputs after successful save
+      setUserDetails({
+        name: '',
+        phoneNumber: '',
+        vehicleId: '',
+        vehicleType: 'car'
+      });
+      
       alert('Details saved successfully!');
     } catch (error) {
       console.error('Failed to save details:', error);
       alert('Failed to save details. Please try again.');
+      // Keep form visible if save failed
+      setIsDetailsSaved(false);
+      // Remove localStorage flag if save failed
+      localStorage.removeItem('userDetailsSaved');
     }
   };
 
@@ -242,25 +278,34 @@ const LocationTrackingControl = ({
             </button>
           </div>
         ) : (
-          <div className="vehicle-info">
-            <h4>✅ Your Details</h4>
-            <p>
-              <strong>Name:</strong> {currentUser.name}
-            </p>
-            <p>
-              <strong>Vehicle ID:</strong> {currentUser.vehicleId}
-            </p>
-            <p>
-              <strong>Vehicle Type:</strong> {getVehicleEmoji(currentUser.vehicleType)} {currentUser.vehicleType?.charAt(0).toUpperCase() + currentUser.vehicleType?.slice(1)}
-            </p>
-            <p>
-              <strong>Phone:</strong> {currentUser.phoneNumber}
-            </p>
-          </div>
+           <div className="vehicle-info">
+             <h4>✅ Your Details</h4>
+             <p>
+               <strong>Name:</strong> {currentUser?.name || 'N/A'}
+             </p>
+             <p>
+               <strong>Vehicle ID:</strong> {currentUser?.vehicleId || 'N/A'}
+             </p>
+             <p>
+               <strong>Vehicle Type:</strong> {currentUser?.vehicleType ? `${getVehicleEmoji(currentUser.vehicleType)} ${currentUser.vehicleType.charAt(0).toUpperCase() + currentUser.vehicleType.slice(1)}` : 'N/A'}
+             </p>
+             <p>
+               <strong>Phone:</strong> {currentUser?.phoneNumber || localStorage.getItem('userPhone') || 'N/A'}
+             </p>
+           </div>
         )}
 
         {isDetailsSaved && (
           <div className="control-buttons">
+            {/* {onBackToLanding && (
+              <button
+                type="button"
+                onClick={onBackToLanding}
+                className="back-to-landing-btn"
+              >
+                ← Back to Landing Page
+              </button>
+            )} */}
             <button
               onClick={handleToggleLocationTracking}
               disabled={isLoading}

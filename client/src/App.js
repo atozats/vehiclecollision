@@ -10,23 +10,55 @@ import Feedback from "./components/Feedback";
 import InstallPWA from "./components/InstallPWA";
 import "./App.css";
 
+
 // Socket.IO server URL
 // Prefer env override, otherwise use same-origin in production.
-const rawSocketUrl =
-  process.env.REACT_APP_SOCKET_URL ||
-  (window.location.hostname === "localhost"
-    ? "https://ucasaapp.testatozas.in"
-    : window.location.origin);
-const socketUrl = rawSocketUrl.replace(/\/+$/, "");
-const socket = io(socketUrl);
+const getSocketUrl = () => {
+  if (process.env.REACT_APP_SOCKET_URL) {
+    return process.env.REACT_APP_SOCKET_URL.replace(/\/+$/, "");
+  }
+  if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+    return "http://localhost:5000";
+  }
+  // Use current origin (www.ucasaapp.com or ucasaapp.com)
+  // Server CORS is configured to accept both
+  const origin = window.location.origin.replace(/\/+$/, "");
+  console.log('🔌 Socket.IO connecting to:', origin);
+  return origin;
+};
+
+const socketUrl = getSocketUrl();
+const socket = io(socketUrl, {
+  reconnection: true,
+  reconnectionDelay: 1000,
+  reconnectionAttempts: 5,
+  timeout: 20000,
+});
 
 function App() {
   const [vehicles, setVehicles] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [collisionAlert, setCollisionAlert] = useState(null);
   const [demoMode, setDemoMode] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [showLandingPage, setShowLandingPage] = useState(true);
+  // Restore user + skip landing page after refresh if details were already saved
+  const [currentUser, setCurrentUser] = useState(() => {
+    const saved = localStorage.getItem("userDetailsSaved") === "true";
+    const phone = localStorage.getItem("userPhone");
+    if (saved && phone) {
+      return {
+        phoneNumber: phone,
+        name: localStorage.getItem("userName") || "User",
+        vehicleId: localStorage.getItem("userVehicleId") || "",
+        vehicleType: localStorage.getItem("userVehicleType") || "car",
+      };
+    }
+    return null;
+  });
+  const [showLandingPage, setShowLandingPage] = useState(() => {
+    const saved = localStorage.getItem("userDetailsSaved") === "true";
+    const phone = localStorage.getItem("userPhone");
+    return !(saved && phone);
+  });
   const [gpsStatus, setGpsStatus] = useState("inactive"); // inactive, searching, active, error
   const [systemStatus, setSystemStatus] = useState({
     monitoring: "Active",
@@ -42,6 +74,37 @@ function App() {
 
   // Separate useEffect for socket setup
   useEffect(() => {
+    // Monitor socket connection status
+    const onConnect = () => {
+      console.log("✅ Socket.IO connected:", socket.id);
+    };
+    
+    const onDisconnect = (reason) => {
+      console.warn("⚠️ Socket.IO disconnected:", reason);
+    };
+    
+    const onConnectError = (error) => {
+      console.error("❌ Socket.IO connection error:", error);
+    };
+    
+    socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
+    socket.on("connect_error", onConnectError);
+    
+    // Wait for connection before emitting requests
+    const requestData = () => {
+      if (socket.connected) {
+        socket.emit("get-vehicles");
+        socket.emit("get-all-users");
+      } else {
+        // Wait for connection
+        socket.once("connect", () => {
+          socket.emit("get-vehicles");
+          socket.emit("get-all-users");
+        });
+      }
+    };
+    
     // Listen for vehicle updates
     socket.on("vehicles-update", (vehicleList) => {
       setVehicles(vehicleList);
@@ -59,15 +122,15 @@ function App() {
     });
 
     // Listen for collision alerts
-      socket.on("collision-alert", (alert) => {
-        setCollisionAlert(alert);
-        // Auto-dismiss alert after 3 minutes (180 seconds)
-        setTimeout(() => setCollisionAlert(null), 180000);
-      });
+    socket.on("collision-alert", (alert) => {
+      setCollisionAlert(alert);
+      // Auto-dismiss alert after 3 minutes (180 seconds)
+      setTimeout(() => setCollisionAlert(null), 180000);
+    });
 
+    
     // Request initial vehicle list and all users
-    socket.emit("get-vehicles");
-    socket.emit("get-all-users");
+    requestData();
 
     // Update time every second
     const timeInterval = setInterval(() => {
@@ -83,6 +146,9 @@ function App() {
     }, 10000);
 
     return () => {
+      socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
+      socket.off("connect_error", onConnectError);
       socket.off("vehicles-update");
       socket.off("all-users-update");
       socket.off("collision-alert");
@@ -91,34 +157,111 @@ function App() {
     };
   }, []);
   
-  // Check if user is already registered in database
+  
+  // Check if user is already registered in databasee
   useEffect(() => {
     const checkExistingUser = async () => {
       // Try to get user from a stored phone number
       const storedPhone = localStorage.getItem("userPhone");
+      const savedFlag = localStorage.getItem("userDetailsSaved") === "true";
+
+      // If user already saved locally, keep them in-app (no landing, no form)
+      if (storedPhone && savedFlag) {
+        setShowLandingPage(false);
+        setCurrentUser((prev) => {
+          if (prev?.phoneNumber) return prev;
+          return {
+            phoneNumber: storedPhone,
+            name: localStorage.getItem("userName") || "User",
+            vehicleId: localStorage.getItem("userVehicleId") || "",
+            vehicleType: localStorage.getItem("userVehicleType") || "car",
+          };
+        });
+      }
+
       if (storedPhone) {
         try {
-          const response = await fetch(`https://ucasaapp.testatozas.in/api/user/${storedPhone}`);
+          const apiUrl = process.env.NODE_ENV === 'production' 
+            ? window.location.origin 
+            : 'http://localhost:5000';
+          const response = await fetch(`${apiUrl}/api/user/${storedPhone}`);
+          
+          // Check if response is JSON before parsing
+          const contentType = response.headers.get("content-type");
+          if (!contentType || !contentType.includes("application/json")) {
+            console.warn("API response is not JSON, got:", contentType);
+            // If user was saved locally, keep showing ✅ Your Details.
+            // This commonly happens when the server returns an HTML page (redirect/404) or is down.
+            if (savedFlag) {
+              setShowLandingPage(false);
+              return;
+            }
+            // Otherwise, reset to landing
+            localStorage.removeItem("userPhone");
+            localStorage.removeItem("userDetailsSaved");
+            setCurrentUser(null);
+            setShowLandingPage(true);
+            return;
+          }
+          
           if (response.ok) {
             const result = await response.json();
             if (result.success) {
               setCurrentUser(result.user);
               setShowLandingPage(false);
+              // Persist latest user fields so refresh always shows ✅ Your Details
+              localStorage.setItem("userDetailsSaved", "true");
+              localStorage.setItem("userPhone", result.user.phoneNumber);
+              localStorage.setItem("userName", result.user.name || "User");
+              localStorage.setItem("userVehicleId", result.user.vehicleId || "");
+              localStorage.setItem("userVehicleType", result.user.vehicleType || "car");
               // Auto-register the user as a vehicle (but don't wait for response)
               handleAddVehicle(result.user.phoneNumber, result.user.vehicleId, result.user.name, result.user.vehicleType || 'car')
                 .catch(error => console.error("Auto-registration failed:", error));
             } else {
-              setShowLandingPage(true);
+              // If we have a saved local user, keep UI stable; otherwise show landing
+              if (!savedFlag) setShowLandingPage(true);
             }
           } else {
-            // User not found in database, clear local storage
-            localStorage.removeItem("userPhone");
+            // Non-200 JSON response; if it's a real 404 (user deleted), let them re-add.
+            let errorBody = null;
+            try {
+              errorBody = await response.json();
+            } catch {
+              // ignore
+            }
+            const notFound =
+              response.status === 404 ||
+              (errorBody && (errorBody.error || "").toLowerCase().includes("not found"));
+
+            if (notFound) {
+              localStorage.removeItem("userPhone");
+              localStorage.removeItem("userDetailsSaved");
+              localStorage.removeItem("userName");
+              localStorage.removeItem("userVehicleId");
+              localStorage.removeItem("userVehicleType");
+              setCurrentUser(null);
+              setShowLandingPage(true);
+              return;
+            }
+
+            // Otherwise keep local user if present
+            if (savedFlag) {
+              setShowLandingPage(false);
+              return;
+            }
             setShowLandingPage(true);
           }
         } catch (error) {
           console.error("Failed to fetch user data:", error);
-          // Clear local storage on error
+          // Network/server error: keep showing ✅ Your Details if we have local saved user
+          if (savedFlag) {
+            setShowLandingPage(false);
+            return;
+          }
           localStorage.removeItem("userPhone");
+          localStorage.removeItem("userDetailsSaved");
+          setCurrentUser(null);
           setShowLandingPage(true);
         }
       } else {
@@ -437,30 +580,63 @@ function App() {
 
   const handleAddVehicle = (phoneNumber, vehicleId, fullName, vehicleType) => {
     return new Promise((resolve, reject) => {
-      socket.emit("register-vehicle", { phoneNumber, vehicleId, fullName, vehicleType });
+      // Check if socket is connected
+      if (!socket.connected) {
+        console.warn("Socket not connected, waiting for connection...");
+        
+        // Wait for connection with timeout
+        const connectionTimeout = setTimeout(() => {
+          socket.off("connect", onConnect);
+          reject(new Error("Socket connection timeout. Please check if the server is running."));
+        }, 10000);
+        
+        const onConnect = () => {
+          clearTimeout(connectionTimeout);
+          socket.off("connect", onConnect);
+          // Retry registration after connection
+          registerVehicle();
+        };
+        
+        socket.on("connect", onConnect);
+        return;
+      }
       
-      // Listen for registration success
-      const handleSuccess = (data) => {
-        socket.off("registration-success", handleSuccess);
-        socket.off("registration-error", handleError);
-        resolve(data);
+      // Register vehicle function
+      const registerVehicle = () => {
+        console.log("Registering vehicle:", { phoneNumber, vehicleId, fullName, vehicleType });
+        socket.emit("register-vehicle", { phoneNumber, vehicleId, fullName, vehicleType });
+        
+        // Listen for registration success
+        const handleSuccess = (data) => {
+          clearTimeout(timeoutId);
+          socket.off("registration-success", handleSuccess);
+          socket.off("registration-error", handleError);
+          console.log("Vehicle registered successfully:", data);
+          resolve(data);
+        };
+        
+        const handleError = (error) => {
+          clearTimeout(timeoutId);
+          socket.off("registration-success", handleSuccess);
+          socket.off("registration-error", handleError);
+          console.error("Registration error:", error);
+          reject(new Error(error.error || "Failed to register vehicle."));
+        };
+        
+        socket.on("registration-success", handleSuccess);
+        socket.on("registration-error", handleError);
+        
+        // Timeout after 15 seconds (increased from 10)
+        const timeoutId = setTimeout(() => {
+          socket.off("registration-success", handleSuccess);
+          socket.off("registration-error", handleError);
+          console.error("Registration timeout - socket connected:", socket.connected);
+          reject(new Error("Registration timeout. Server may be slow or unresponsive."));
+        }, 15000);
       };
       
-      const handleError = (error) => {
-        socket.off("registration-success", handleSuccess);
-        socket.off("registration-error", handleError);
-        reject(new Error(error.error || "Registration failed"));
-      };
-      
-      socket.on("registration-success", handleSuccess);
-      socket.on("registration-error", handleError);
-      
-      // Timeout after 10 seconds
-      setTimeout(() => {
-        socket.off("registration-success", handleSuccess);
-        socket.off("registration-error", handleError);
-        reject(new Error("Registration timeout"));
-      }, 10000);
+      // Start registration
+      registerVehicle();
     });
   };
 
@@ -545,7 +721,70 @@ function App() {
     setCollisionAlert(null);
   };
 
-  const handleGetStarted = () => {
+  const handleGetStarted = async () => {
+    // Check if user details were already saved
+    const saved = localStorage.getItem('userDetailsSaved');
+    const savedPhone = localStorage.getItem('userPhone');
+    
+    if (saved === 'true' && savedPhone) {
+      // Try to restore user from API
+        try {
+          const apiUrl = process.env.NODE_ENV === 'production' 
+            ? window.location.origin 
+            : 'http://localhost:5000';
+          const response = await fetch(`${apiUrl}/api/user/${savedPhone}`);
+          
+          // Check if response is JSON before parsing
+          const contentType = response.headers.get("content-type");
+          if (!contentType || !contentType.includes("application/json")) {
+            console.warn("API response is not JSON, got:", contentType);
+            // Fall back to localStorage data
+            const userData = {
+              phoneNumber: savedPhone,
+              name: localStorage.getItem('userName') || 'User',
+              vehicleId: localStorage.getItem('userVehicleId') || '',
+              vehicleType: localStorage.getItem('userVehicleType') || 'car'
+            };
+            setCurrentUser(userData);
+            setShowLandingPage(false);
+            return;
+          }
+          
+          if (response.ok) {
+            const result = await response.json();
+            if (result.success && result.user) {
+              setCurrentUser(result.user);
+              setShowLandingPage(false);
+              // Auto-register the user as a vehicle
+              handleAddVehicle(result.user.phoneNumber, result.user.vehicleId, result.user.name, result.user.vehicleType || 'car')
+                .catch(error => console.error("Auto-registration failed:", error));
+              return;
+            }
+          }
+        } catch (error) {
+          console.error("Failed to fetch user data:", error);
+          // Fall back to localStorage data
+          const userData = {
+            phoneNumber: savedPhone,
+            name: localStorage.getItem('userName') || 'User',
+            vehicleId: localStorage.getItem('userVehicleId') || '',
+            vehicleType: localStorage.getItem('userVehicleType') || 'car'
+          };
+          setCurrentUser(userData);
+          setShowLandingPage(false);
+        }
+      
+      // If API call fails, restore from localStorage (basic info)
+      // This ensures form doesn't show even if API is down
+      const userData = {
+        phoneNumber: savedPhone,
+        name: localStorage.getItem('userName') || 'User',
+        vehicleId: localStorage.getItem('userVehicleId') || '',
+        vehicleType: localStorage.getItem('userVehicleType') || 'car'
+      };
+      setCurrentUser(userData);
+    }
+    
     setShowLandingPage(false);
   };
 
@@ -581,8 +820,9 @@ function App() {
     );
   }
 
-  // Show landing page if no user and landing page should be shown
-  if (showLandingPage && !currentUser) {
+  // Show landing page when requested (even if user exists).
+  // This allows a "Back" button that returns to Landing while keeping saved details.
+  if (showLandingPage) {
     return (
       <div className="App">
         <LandingPage 
@@ -636,15 +876,13 @@ function App() {
       <header className="App-header">
         <div className="header-content">
           <div className="header-main">
-            {!currentUser && (
-              <button 
-                className="back-btn"
-                onClick={handleBackToLanding}
-                title="Back to Landing Page"
-              >
-                ← Back
-              </button>
-            )}
+            <button 
+              className="back-btn"
+              onClick={handleBackToLanding}
+              title="Back to Landing Page"
+            >
+              ← Back
+            </button>
             {/* <span className="header-icon">UcasaApp</span> */}
             <div>
               <h1>Universal Collision Avoidance System Advisory App</h1>
@@ -708,6 +946,7 @@ function App() {
           onStartSimulated={() => startSimulatedLocationDirect(currentUser)}
           onUpdateUser={handleUpdateUser}
           onStopGPS={stopGPSTracking}
+          onBackToLanding={handleBackToLanding}
         />
 
         {collisionAlert && (
