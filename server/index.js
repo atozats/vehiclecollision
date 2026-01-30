@@ -135,6 +135,7 @@ app.get('/service-worker.js', (req, res) => {
   res.sendFile(path.join(__dirname, "build", "service-worker.js"));
 });
 
+
 // Catch-all route for client-side routing (must be last)
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "build", "index.html"));
