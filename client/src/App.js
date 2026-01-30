@@ -128,6 +128,7 @@ function App() {
       setTimeout(() => setCollisionAlert(null), 180000);
     });
 
+    
     // Request initial vehicle list and all users
     requestData();
 
