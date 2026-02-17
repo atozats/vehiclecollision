@@ -16,12 +16,21 @@
   align-items: center;
   max-width: 1200px;
   margin: 0 auto;
+  gap: 20px;
 }
 
 .header-main {
   display: flex;
   align-items: center;
   gap: 15px;
+  flex: 1;
+}
+
+.header-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .back-btn {
@@ -192,6 +201,11 @@
     gap: 10px;
   }
 
+  .header-center {
+    width: 100%;
+    order: 2;
+  }
+
   .back-btn {
     margin-right: 0;
     margin-bottom: 5px;
@@ -199,6 +213,10 @@
 
   .user-details {
     align-items: center;
+  }
+
+  .user-info {
+    order: 3;
   }
 }
 

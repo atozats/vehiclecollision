@@ -8,6 +8,8 @@ import AboutLegal from "./components/AboutLegal";
 import Contact from "./components/Contact";
 import Feedback from "./components/Feedback";
 import InstallPWA from "./components/InstallPWA";
+import { PaymentButton } from "atozas-frontend-payment";
+import "atozas-frontend-payment/dist/style.css";
 import "./App.css";
 
 
@@ -888,6 +890,9 @@ function App() {
               <h1>Universal Collision Avoidance System Advisory App</h1>
               <p>GPS-based proximity alarm for accident prevention</p>
             </div>
+          </div>
+          <div className="header-center">
+            <PaymentButton />
           </div>
           <div className="user-info">
             <div className="user-details">
