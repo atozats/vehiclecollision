@@ -12,18 +12,23 @@ import "./App.css";
 
 
 // Socket.IO server URL
-// Prefer env override, otherwise use same-origin in production.
+// When site is on a public origin (e.g. https://www.ucasaapp.com), never use localhost
+// (browsers block that via Local Network Access). Use same-origin or configured backend only.
 const getSocketUrl = () => {
-  if (process.env.REACT_APP_SOCKET_URL) {
-    return process.env.REACT_APP_SOCKET_URL.replace(/\/+$/, "");
+  const origin = window.location.origin.replace(/\/+$/, "");
+  const isLocalSite = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+
+  const envUrl = (process.env.REACT_APP_SOCKET_URL || "").trim().replace(/\/+$/, "");
+  const envIsLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(envUrl);
+
+  if (envUrl && (isLocalSite || !envIsLocal)) {
+    return envUrl;
   }
-  if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+  if (isLocalSite) {
     return "http://localhost:5000";
   }
-  // Use current origin (www.ucasaapp.com or ucasaapp.com)
-  // Server CORS is configured to accept both
-  const origin = window.location.origin.replace(/\/+$/, "");
-  console.log('🔌 Socket.IO connecting to:', origin);
+  // Public site: use same origin (avoids Local Network Access block)
+  console.log("🔌 Socket.IO connecting to:", origin);
   return origin;
 };
 
