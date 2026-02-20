@@ -80,7 +80,7 @@ function App() {
   const [subscriptionActivated, setSubscriptionActivated] = useState(false);
 
 
-  
+
   const MONTHLY_RATE = 100; // Rs 100 per month
   const SUBSCRIPTION_PLANS = [
     { id: "monthly", label: "Monthly", months: 1, enabled: false },
@@ -387,6 +387,8 @@ function App() {
           };
           handleLocationUpdate(locationData);
 
+
+          
           // Now start continuous tracking with more relaxed settings
           watchId = navigator.geolocation.watchPosition(
             (position) => {
