@@ -85,7 +85,7 @@ function App() {
   const SUBSCRIPTION_PLANS = [
     { id: "monthly", label: "Monthly", months: 1, enabled: false },
     { id: "3month", label: "3 Months", months: 3, enabled: false },
-    { id: "6month", label: "6 Months", months: 6, enabled: true, price: 100 },
+    { id: "6month", label: "6 Months", months: 6, enabled: true },
     { id: "yearly", label: "Yearly", months: 12, enabled: false },
     { id: "3yearly", label: "3 Yearly", months: 36, enabled: false },
   ];
