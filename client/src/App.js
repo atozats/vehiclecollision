@@ -71,6 +71,22 @@ function App() {
   const [aboutLegalView, setAboutLegalView] = useState(null);
   const [showContact, setShowContact] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [showAccountPanel, setShowAccountPanel] = useState(false);
+  const [subscriptionActivated, setSubscriptionActivated] = useState(false);
+
+  const MONTHLY_RATE = 100; // Rs 100 per month
+  const SUBSCRIPTION_PLANS = [
+    { id: "monthly", label: "Monthly", months: 1, enabled: false },
+    { id: "3month", label: "3 Months", months: 3, enabled: false },
+    { id: "6month", label: "6 Months", months: 6, enabled: true },
+    { id: "yearly", label: "Yearly", months: 12, enabled: false },
+    { id: "3yearly", label: "3 Yearly", months: 36, enabled: false },
+  ];
+  const selectedPlanId = "6month";
+  const selectedPlan = SUBSCRIPTION_PLANS.find((p) => p.id === selectedPlanId);
+  const totalBeforeDiscount = selectedPlan ? selectedPlan.months * MONTHLY_RATE : 0;
+  const discountPercent = 100;
+  const amountToPay = 0; // 100% discount
 
   // Separate useEffect for socket setup
   useEffect(() => {
@@ -875,7 +891,7 @@ function App() {
     <div className="App">
       <header className="App-header">
         <div className="header-content">
-          <div className="header-main">
+          <div className="header-left">
             <button 
               className="back-btn"
               onClick={handleBackToLanding}
@@ -889,7 +905,7 @@ function App() {
               <p>GPS-based proximity alarm for accident prevention</p>
             </div>
           </div>
-          <div className="user-info">
+          <div className="user-info header-right">
             <div className="user-details">
               <span className="user-name">👤 {currentUser?.name}</span>
               <span className="user-vehicle">🚗 {currentUser?.vehicleId}</span>
@@ -900,6 +916,90 @@ function App() {
                 {gpsStatus === "error" && "❌ GPS Error"}
                 {gpsStatus === "inactive" && "📍 GPS Inactive"}
               </div>
+            </div>
+            <div className="account-btn-wrapper">
+              <button
+                type="button"
+                className="account-btn"
+                onClick={() => setShowAccountPanel((p) => !p)}
+                title="Account & Subscription"
+              >
+                Account
+              </button>
+              {showAccountPanel && (
+                <>
+                  <div
+                    className="account-panel-backdrop"
+                    onClick={() => setShowAccountPanel(false)}
+                    aria-hidden="true"
+                  />
+                  <div className="account-panel" role="dialog" aria-labelledby="subscription-title" aria-modal="true">
+                    <div className="account-panel-header">
+                      <h2 id="subscription-title" className="account-panel-title">Subscription</h2>
+                      <button
+                        type="button"
+                        className="account-panel-close"
+                        onClick={() => setShowAccountPanel(false)}
+                        aria-label="Close"
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <p className="subscription-rate">
+                      <span className="subscription-rate-label">Monthly rate</span>
+                      <span className="subscription-rate-value">Rs {MONTHLY_RATE}</span>
+                    </p>
+                    <div className="subscription-options">
+                      {SUBSCRIPTION_PLANS.map((plan) => {
+                        const total = plan.months * MONTHLY_RATE;
+                        const isSelected = plan.id === selectedPlanId;
+                        return (
+                          <label
+                            key={plan.id}
+                            className={`subscription-option ${!plan.enabled ? "disabled" : ""} ${isSelected ? "selected" : ""}`}
+                          >
+                            <input
+                              type="radio"
+                              name="subscription"
+                              checked={isSelected}
+                              disabled={!plan.enabled}
+                              readOnly
+                            />
+                            <span className="option-label">
+                              <span className="option-name">{plan.label}</span>
+                              <span className="option-price">Rs {total}</span>
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <div className="subscription-summary">
+                      <div className="summary-row">
+                        <span>Subtotal ({selectedPlan?.months || 0} months)</span>
+                        <span>Rs {totalBeforeDiscount}</span>
+                      </div>
+                      <div className="summary-row summary-row-discount">
+                        <span>Discount ({discountPercent}%)</span>
+                        <span>− Rs {totalBeforeDiscount}</span>
+                      </div>
+                      <div className="summary-row summary-row-total">
+                        <span>Amount to pay</span>
+                        <span>Rs {amountToPay}</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className={`subscription-active-btn ${subscriptionActivated ? "activated" : ""}`}
+                      onClick={() => {
+                        setSubscriptionActivated(true);
+                        setShowAccountPanel(false);
+                      }}
+                    >
+                      {subscriptionActivated ? "Activated" : "Active"}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
             <div className="header-buttons">
               {/* {gpsStatus === "inactive" || gpsStatus === "error" ? (
