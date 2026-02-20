@@ -79,6 +79,8 @@ function App() {
   const [showAccountPanel, setShowAccountPanel] = useState(false);
   const [subscriptionActivated, setSubscriptionActivated] = useState(false);
 
+
+  
   const MONTHLY_RATE = 100; // Rs 100 per month
   const SUBSCRIPTION_PLANS = [
     { id: "monthly", label: "Monthly", months: 1, enabled: false },
