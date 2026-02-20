@@ -17,17 +17,16 @@ function getFromEmail() {
 
 const app = express();
 const server = http.createServer(app);
-// CORS configuration - allow both www and non-www versions
-const allowedOrigins = process.env.NODE_ENV === 'production'
-  ? [
-      "https://www.ucasaapp.com",
-      "https://ucasaapp.com",
-      "https://ucasaapp.testatozas.in"
-    ]
-  : [
-      "http://localhost:3000",
-      "http://localhost:5000"
-    ];
+// CORS configuration - allow both www and non-www frontend + backend
+const allowedOrigins = [
+  "https://www.ucasaapp.com",
+  "https://ucasaapp.com",
+  "https://ucasaapp.testatozas.in",
+  "http://localhost:3000",
+  "http://localhost:5000",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:5000",
+];
 
 const io = socketIo(server, {
   cors: {

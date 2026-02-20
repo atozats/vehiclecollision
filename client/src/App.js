@@ -78,13 +78,14 @@ function App() {
   const SUBSCRIPTION_PLANS = [
     { id: "monthly", label: "Monthly", months: 1, enabled: false },
     { id: "3month", label: "3 Months", months: 3, enabled: false },
-    { id: "6month", label: "6 Months", months: 6, enabled: true },
+    { id: "6month", label: "6 Months", months: 6, enabled: true, price: 100 },
     { id: "yearly", label: "Yearly", months: 12, enabled: false },
     { id: "3yearly", label: "3 Yearly", months: 36, enabled: false },
   ];
   const selectedPlanId = "6month";
   const selectedPlan = SUBSCRIPTION_PLANS.find((p) => p.id === selectedPlanId);
-  const totalBeforeDiscount = selectedPlan ? selectedPlan.months * MONTHLY_RATE : 0;
+  const getPlanTotal = (plan) => (plan.price != null ? plan.price : plan.months * MONTHLY_RATE);
+  const totalBeforeDiscount = selectedPlan ? getPlanTotal(selectedPlan) : 0;
   const discountPercent = 100;
   const amountToPay = 0; // 100% discount
 
@@ -951,7 +952,7 @@ function App() {
                     </p>
                     <div className="subscription-options">
                       {SUBSCRIPTION_PLANS.map((plan) => {
-                        const total = plan.months * MONTHLY_RATE;
+                        const total = getPlanTotal(plan);
                         const isSelected = plan.id === selectedPlanId;
                         return (
                           <label
